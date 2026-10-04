@@ -44,7 +44,9 @@ function M.read(entity, wire, fallback)
   assert(entity and entity.valid, "circuit port unavailable")
   local signals = {}
   if wire ~= nil then
-    assert(wire == "red" or wire == "green", "wire must be red or green")
+    if wire == defines.wire_type.red then wire = "red"
+    elseif wire == defines.wire_type.green then wire = "green" end
+    assert(wire == "red" or wire == "green", "wire must be red or green (text or defines.wire_type)")
     local network = entity.get_circuit_network(defines.wire_connector_id["circuit_" .. wire])
     if network then signals = network.signals or {} else signals = fallback or {} end
   else

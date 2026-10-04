@@ -1,4 +1,5 @@
 local examples=require("examples")
+local GUI=require("__computer_core_2__.scripts.gui")
 local function call(method, ...) return remote.call("computer_core_2", method, ...) end
 local function check(name, condition)
   assert(condition, "FAIL: " .. name)
@@ -47,6 +48,11 @@ return {
 ]]
 script.on_init(function()
   storage.checks = 0
+  local editor={base='old',draft='my changes'}
+  check('editor detects conflict without losing draft',not GUI.check_save(editor,'other changes') and editor.draft=='my changes')
+  check('editor rebase rejects intervening file changes',not GUI.rebase(editor,'newer changes') and editor.base=='old' and editor.draft=='my changes')
+  check('editor explicit reviewed rebase retains draft',GUI.rebase(editor,'newer changes') and editor.base=='newer changes' and editor.draft=='my changes')
+  check('rebased editor ordinary save comparison',GUI.check_save(editor,'newer changes') and not GUI.check_save(editor,'changed again'))
   local surface = game.surfaces[1]
   surface.request_to_generate_chunks({0, 0}, 2); surface.force_generate_chunk_requests()
   for _, entity in ipairs(surface.find_entities_filtered{area = {{-30, -30}, {30, 30}}, type = {"tree", "simple-entity"}}) do entity.destroy() end
@@ -100,6 +106,18 @@ script.on_init(function()
   check("source library", call('run', a, persistent, 'library'))
   check("library result", data(a).state.value == 10)
   call('stop', a)
+  check('variable readback isolation program',call('run',a,[[
+    os.set('copy', {value=1}, nil, 3)
+    local value, hole, last=os.get('copy')
+    assert(hole==nil and last==3)
+    value.value=2; value.bad=function() end; value.self=value
+    value.large=string.rep('x',262145)
+  ]],'readback'))
+  check('variable readback cannot persist mutation/function/cycle/oversize',data(a).vars.copy[1].value==1 and data(a).vars.copy[1].bad==nil and data(a).vars.copy[1].self==nil and data(a).vars.copy[1].large==nil)
+  local long_directory=string.rep('p',1000)
+  exec(a,'mkdir '..long_directory); exec(a,'cd '..long_directory)
+  check('normalized relative paths respect metadata budget',not select(3,call('exec',a,'mkdir '..string.rep('q',40))))
+  exec(a,'cd /'); exec(a,'rm '..long_directory)
   local player = game.players[1]
   if player then
   player.create_character(); player.teleport({0,4})
@@ -112,6 +130,14 @@ script.on_init(function()
   gui(player,'cc2_source',defines.events.on_gui_text_changed,"term.write('GUI works')")
   gui(player,'cc2_save_run')
   check("editor save/run", data(a).fs['/gui.lua'].text == "term.write('GUI works')" and data(a).output:find('GUI works',1,true))
+  gui(player,'cc2_command',defines.events.on_gui_text_changed,'edit /gui.lua')
+  gui(player,'cc2_command',defines.events.on_gui_confirmed)
+  gui(player,'cc2_source',defines.events.on_gui_text_changed,"term.write('my retained draft')")
+  call('run',a,[[disk.writeFile('/gui.lua', "term.write('someone else')")]],'concurrent-edit')
+  gui(player,'cc2_save')
+  check('GUI conflict leaves current file intact',data(a).fs['/gui.lua'].text=="term.write('someone else')" and find(player.gui.screen.cc2_root,'cc2_rebase')~=nil)
+  gui(player,'cc2_rebase'); gui(player,'cc2_save')
+  check('GUI explicit rebase then save',data(a).fs['/gui.lua'].text=="term.write('my retained draft')")
   gui(player,'cc2_waypoint')
   gui(player,'cc2_wp_name',defines.events.on_gui_text_changed,'Home')
   gui(player,'cc2_wp_save')
@@ -136,7 +162,18 @@ script.on_init(function()
   other_surface.request_to_generate_chunks({0,0},1); other_surface.force_generate_chunk_requests()
   storage.other = spawn({0,0},other_surface)
   check("surface mount isolation", not select(3, call('exec',storage.other,'cat /mnt/alpha/programs/a')))
-  if player then check("surface editor isolation", not call('open',storage.other,player.index)) end
+  if player then
+    check("surface editor isolation", not call('open',storage.other,player.index))
+    local personal_surface=game.create_surface('personal-surface-test',{width=32,height=32})
+    personal_surface.request_to_generate_chunks({0,0},1); personal_surface.force_generate_chunk_requests()
+    player.teleport({0,0},personal_surface)
+    call('openGauntlet',player.index)
+    call('run',storage.personal,[[state.surface_marker=true; disk.writeFile('/surface-marker','retained')]],'personal-surface')
+    gui(player,'cc2_close')
+    player.teleport({0,4},surface)
+    game.delete_surface(personal_surface)
+    check('surface deletion preserves player-owned computer data',data(storage.personal).state.surface_marker and data(storage.personal).fs['/surface-marker'].text=='retained')
+  end
   local entity = call('getEntity',a)
   local clone = entity.clone{position={12,0},surface=surface,force='player'}
   assert(clone)
@@ -182,7 +219,21 @@ script.on_init(function()
   check('extension API help',exec(storage.device,'help device'):find('value()',1,true)~=nil)
   call('input',storage.device,'device input')
   check('extension input event',data(storage.device).extension_state.device.input=='device input')
+  local teardown=surface.create_entity{name='car',position={36,0},force='player'}
+  local teardown_id=call('addEntityStructure',{entity=teardown,type='teardown',sub={}})
+  check('invalid reconstruction stops program',not call('run',teardown_id,[[assert(not state.fail); return {init=function() state.fail=true end}]],'bad-declaration'))
+  check('extension cleanup independent of program reconstruction',data(teardown_id).extension_state.device.stops==1 and not data(teardown_id).running)
+  teardown.destroy{raise_destroy=true}
   call('addComputerAPI',[[return {name='device',entities={'car'},prototype={value={'value',function() return -100 end}}}]])
+  for _,name in ipairs({'quota_one','quota_two'}) do
+    call('addComputerAPI',"return {name='"..name.."',entities={'car'},prototype={__init={'init',function(self) self.__state.payload=string.rep('x',140000) end}}}")
+  end
+  local quota_entity=surface.create_entity{name='car',position={36,8},force='player'}
+  local quota_id=call('registerEntity',quota_entity)
+  check('aggregate extension state quota enforced',not call('run',quota_id,[[return {}]],'extension-quota'))
+  check('rejected extension aggregate remains serializable',not data(quota_id).running)
+  quota_entity.destroy{raise_destroy=true}
+  call('removeComputerAPI','quota_one'); call('removeComputerAPI','quota_two')
   storage.timer_test=spawn({0,-8})
   check('timer ordering start',call('run',storage.timer_test,[[return {
     init=function()
@@ -217,6 +268,14 @@ script.on_init(function()
   check('full filesystem content quota accepted',call('run',full_disk,[[disk.writeFile('/full',string.rep('x',1048576))]],'full-disk'))
   check('full filesystem snapshot includes metadata',#call('snapshot',full_disk).computer_core_2.fs['/full'].text==1048576)
   check('full filesystem remote read',#data(full_disk).fs['/full'].text==1048576)
+  local full_clone=call('getEntity',full_disk).clone{position={-32,8},surface=surface,force='player'}
+  local full_clone_id
+  for _,id in ipairs(call('getComputerIDs')) do if call('getEntity',id)==full_clone then full_clone_id=id end end
+  check('full filesystem clone metadata budget',#data(full_clone_id).fs['/full'].text==1048576)
+  local full_blueprint=spawn({-32,0},surface,call('snapshot',full_disk))
+  check('full filesystem blueprint import metadata budget',#data(full_blueprint).fs['/full'].text==1048576)
+  full_clone.destroy{raise_destroy=true}
+  call('getEntity',full_blueprint).destroy{raise_destroy=true}
   call('getEntity',full_disk).destroy{raise_destroy=true}
   storage.alias=spawn({-8,8})
   check('nested library setup',call('run',storage.alias,[[disk.writeFile('/child', 'return {value=4}'); disk.writeFile('/parent', "return os.require('/child')")]],'setup'))
@@ -230,6 +289,20 @@ script.on_init(function()
     storage.examples[name]=id
     check('shipped example '..name,call('run',id,examples[name],'/examples/'..name..'.lua'))
   end
+  -- Fill the real shared queue with player-source messages to an unpowered
+  -- listener. The next lifecycle tick must not throw while announcing new builds.
+  storage.queue_sink=spawn({-24,-16})
+  exec(storage.queue_sink,'label set queue_sink')
+  check('queue-pressure receiver starts',call('run',storage.queue_sink,[[return {
+    init=function() wlan.on('flood','message'); wlan.onBuiltComputer('built') end,
+    message=function() end,built=function() end
+  }]],'queue-sink'))
+  call('getEntity',storage.queue_sink).energy=0
+  storage.queue_sender=spawn({-24,-8})
+  check('queue-pressure source finishes safely',call('run',storage.queue_sender,[[for i=1,4097 do
+    if not pcall(wlan.emit,'queue_sink','flood') then state.full=true; break end
+  end]],'queue-flood'))
+  check('queue is actually saturated',data(storage.queue_sender).state.full)
   local inventory=game.create_inventory(1)
   inventory[1].set_stack{name='blueprint'}
   local mapping=inventory[1].create_blueprint{surface=surface,force='player',area={{-4,-2},{2,2}}}
@@ -244,7 +317,12 @@ local reloaded=false
 script.on_load(function() reloaded=storage.stage==2 end)
 script.on_event(defines.events.on_tick,function()
   local a,b=storage.a,storage.b
-  if game.tick==3 then
+  if game.tick==1 then
+    check('saturated queue cannot crash lifecycle build tick',data(a).process.dropped_built>0)
+    call('stop',storage.queue_sink)
+    call('getEntity',storage.queue_sink).destroy{raise_destroy=true}
+    call('getEntity',storage.queue_sender).destroy{raise_destroy=true}
+  elseif game.tick==3 then
     check('destroy without raised event cleanup',not pcall(data,storage.clone))
     local ports=call('getPorts',a)
     call('stop',a)
@@ -252,6 +330,8 @@ script.on_event(defines.events.on_tick,function()
     local found=false
     for _,signal in ipairs(data(a).state.network) do if signal.signal.name=='signal-B' and signal.count==42 then found=true end end
     check('external signal count',found)
+    check('numeric wire constant compatibility',call('run',a,[[state.numeric_network=lan.readLeftSignals(defines.wire_type.red); defines.direction.north=-999]],'legacy-constants'))
+    check('numeric wire matches red network',data(a).state.numeric_network[1].count==42 and defines.direction.north~=-999)
     call('run',a,[[return {init=function() state.sent=0; wlan.onBuiltComputer('built'); os.wait('send',0.1) end, send=function() wlan.emit('beta','message',{value=7}); wlan.emit('device_receiver','device_msg',7); state.sent=state.sent+1 end, built=function(event) state.built=event.computerID end}]],'sender')
   elseif game.tick==15 then
     check('wireless delivery',data(b).state.messages==1 and data(b).state.message.value==7)

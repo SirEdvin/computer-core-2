@@ -54,6 +54,8 @@ alias `computer_core`. No Factorio 0.16 save conversion or old bytecode import.
   (or ownership of the personal computer). Remote callers are trusted installed mods.
 - A conflicting editor save is rejected without overwriting someone else's changes.
   Forced closure retains bounded drafts recoverable from the personal gauntlet.
+  Review the current file and choose Keep draft & rebase to accept that version as
+  the new base; a later Save still rejects any further concurrent change.
 - Blueprint files are untrusted and validated before import. No process, identity,
   label, callback or pending message is copied from blueprint tags. Clones copy
   filesystem/state/variables but start with a fresh identity and stopped process.
@@ -62,7 +64,7 @@ alias `computer_core`. No Factorio 0.16 save conversion or old bytecode import.
 
 These intentionally add bounds beyond the old mod: 1 MiB file content and 2048 nodes
 per filesystem; 256 KiB program/library source; 256 KiB plain state/variable payloads;
-32-level data depth; 256 timers; 128 terminal listeners and wireless subscriptions;
+32-level data depth; 256 KiB aggregate extension state; extension names <=128 bytes; 256 timers; 128 terminal listeners and wireless subscriptions;
 4096 queued messages, with 4 KiB message payloads; 128 libraries / 1 MiB total library
 source; 64 registered extensions / 1 MiB registry source; 1000 signal entries;
 64 KiB terminal output; 4 KiB command/input; 16 retained editor drafts per player.

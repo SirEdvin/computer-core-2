@@ -12,7 +12,9 @@ function M.path(c, path)
     if part == ".." then parts[#parts] = nil
     elseif part ~= "." then parts[#parts + 1] = part end
   end
-  return "/" .. table.concat(parts, "/")
+  local normalized = "/" .. table.concat(parts, "/")
+  assert(#normalized <= 1024, "normalized path exceeds length limit")
+  return normalized
 end
 function M.peer(a, b)
   if a.id == b.id then return true end

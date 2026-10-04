@@ -3,7 +3,7 @@ local FS = require("scripts.filesystem")
 local A = require("scripts.adapters")
 local M = {}
 local runtimes = {}
-local build
+local build, environment
 local function active(c, rt)
   assert(c.process and c.process.generation == rt.generation, "program is no longer running")
 end
@@ -28,7 +28,13 @@ function M.output(c, text, replace)
 end
 function M.stop(c, reason)
   local rt
-  if c.process then local ok, result = pcall(build, c, true); if ok then rt = result end end
+  if c.process then
+    rt = {generation = c.process.generation, rebuilding = true, replay = true, constructing = true,
+      handlers = {}, extensions = {}, library_results = {}, loading = {}}
+    local ok, result = pcall(environment, c, rt)
+    if ok then rt.env = result; rt.constructing, rt.rebuilding, rt.replay = false, false, false
+    else M.output(c, "Extension teardown reconstruction error: " .. tostring(result) .. "\n"); rt = nil end
+  end
   if rt then
     for _, name in ipairs(U.keys(rt.extensions)) do
       local entry = rt.extensions[name]
@@ -37,8 +43,12 @@ function M.stop(c, reason)
         local ok, err = pcall(callback, entry.instance)
         if not ok then M.output(c, "Extension stop error: " .. tostring(err) .. "\n") end
       end
-      local ok, value = pcall(U.data, entry.instance.__state)
-      if ok then c.extension_state[name] = value end
+      local ok, value = pcall(function()
+        local values = U.data(c.extension_state)
+        values[name] = U.data(entry.instance.__state)
+        return U.data(values)
+      end)
+      if ok then c.extension_state = value else M.output(c, "Extension stop persistence error: " .. tostring(value) .. "\n") end
     end
   end
   if c.sub then
@@ -58,7 +68,7 @@ local function queue(c, kind, event, args, source)
   storage.next_message = storage.next_message + 1
   storage.messages[#storage.messages + 1] = {id = storage.next_message, target = c.id, generation = c.process and c.process.generation, kind = kind, event = event, args = args, source = source, due = game.tick + 1}
 end
-local function environment(c, rt)
+environment = function(c, rt)
   local p = c.process
   local env = {state = U.data(c.state), args = U.data(p.args)}
   for _, name in ipairs({"assert", "error", "ipairs", "pairs", "next", "select", "tonumber", "tostring", "type", "pcall", "xpcall"}) do env[name] = _G[name] end
@@ -71,6 +81,7 @@ local function environment(c, rt)
   end
   env.math.random = function(...) assert(not rt.rebuilding, "use randomness only in init/handlers"); return math.random(...) end
   env.unpack = table.unpack
+  env.defines = U.data(defines, {nodes = 65536, bytes = 1048576, depth = 16})
   -- Library/disk paths are relative to the executing source, not the shell cwd.
   local function source_path(path)
     local base = rt.current_directory or p.directory
@@ -111,7 +122,7 @@ local function environment(c, rt)
     vars[name] = U.pack(...)
     c.vars = U.data(vars)
   end
-  os.get = function(name) return U.unpack(c.vars[name] or {}) end
+  os.get = function(name) return U.unpack(U.data(c.vars[name] or {})) end
   os.clear = function(name) effect(c, rt); c.vars[name] = nil end
   os.register = function(name, fn)
     assert(rt.constructing and type(fn) == "function", "register handlers at module scope")
@@ -313,7 +324,7 @@ local function persist(c, rt)
   assert(type(state) == "table", "state must be a plain table")
   local ext = U.data(c.extension_state)
   for name, entry in pairs(rt.extensions) do ext[name] = U.data(entry.instance.__state) end
-  c.state, c.extension_state = state, ext
+  c.state, c.extension_state = state, U.data(ext)
 end
 function M.invoke(c, name, args)
   -- Reconstruct for every dispatch, not merely after a disk load. Otherwise
@@ -385,6 +396,10 @@ function M.start(c, source, path, args)
     end
   end
   c.process.extension_ticks = extension_ticks
+  c.process.built_extension = false
+  for _, entry in pairs(rt.extensions) do
+    if (entry.definition.events or {}).on_built_computer then c.process.built_extension = true; break end
+  end
   if next(rt.handlers) == nil and not extension_events then
     c.process = nil; runtimes[c.id] = nil
   else
@@ -423,7 +438,17 @@ function M.built(c)
   c.autorun_available = true
   for _, id in ipairs(U.keys(storage.computers)) do
     local peer = storage.computers[id]
-    if peer.process and FS.peer(c, peer) then queue(peer, "built", "built", U.pack({computerID = c.id, position = U.data(c.position), surface_index = c.surface_index}), c.id) end
+    if peer.process and FS.peer(c, peer) then
+      local subscribed = peer.process.built_extension
+      for _, subscription in ipairs(peer.process.subscriptions) do if subscription.kind == "built" then subscribed = true; break end end
+      if subscribed then
+        -- Lifecycle code must never throw on player-created queue pressure.
+        -- Admit in computer-ID order; drop newest notifications at capacity.
+        if #storage.messages < 4096 then
+          queue(peer, "built", "built", U.pack({computerID = c.id, position = U.data(c.position), surface_index = c.surface_index}), c.id)
+        else peer.process.dropped_built = (peer.process.dropped_built or 0) + 1 end
+      end
+    end
   end
 end
 function M.tick()
@@ -530,7 +555,7 @@ function M.register(source)
   local fn, err = load(source, "@extension", "t", {assert = assert, type = type, pairs = pairs, ipairs = ipairs, table = table, string = string, math = math, defines = defines})
   assert(fn, err)
   local definition = fn()
-  assert(type(definition) == "table" and type(definition.name) == "string" and definition.name:match("^[%a_][%w_]*$"), "API requires a name")
+  assert(type(definition) == "table" and type(definition.name) == "string" and #definition.name <= 128 and definition.name:match("^[%a_][%w_]*$"), "API requires a name")
   assert(not ({os = true, term = true, disk = true, lan = true, wlan = true, speaker = true, state = true})[definition.name], "reserved API name")
   local count, bytes = 0, #source
   for name, old in pairs(storage.extensions) do

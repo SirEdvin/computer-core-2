@@ -64,11 +64,18 @@ function M.render(player)
     frame.add{type = "label", caption = "Editing " .. session.path}
     local editor = frame.add{type = "text-box", name = "cc2_source", text = session.draft or "", tooltip = "Lua source. Persistent programs return named handlers; startup belongs in init."}
     editor.word_wrap = false
-    editor.style.width, editor.style.height = width, height
+    editor.style.width, editor.style.height = width, session.conflict and math.floor(height / 2) or height
+    if session.conflict then
+      frame.add{type = "label", caption = "Current file changed elsewhere. Review it below before rebasing your draft."}
+      local current = frame.add{type = "text-box", name = "cc2_current_source", text = session.conflict}
+      current.read_only, current.word_wrap = true, false
+      current.style.width, current.style.height = width, math.floor(height / 2)
+    end
     local bar = frame.add{type = "flow", direction = "horizontal"}
     bar.add{type = "button", name = "cc2_save", caption = "Save"}
     bar.add{type = "button", name = "cc2_save_run", caption = "Save & run", enabled = c.process == nil}
     bar.add{type = "button", name = "cc2_discard", caption = "Discard & close"}
+    if session.conflict then bar.add{type = "button", name = "cc2_rebase", caption = "Keep draft & rebase", tooltip = "Accept the displayed current file as the new base. Your draft is retained; Save will replace that version only if it has not changed again."} end
   elseif session.view == "waypoint" then
     local key = c.force_index .. ":" .. c.surface_index
     local points = storage.waypoints[key] or {}
@@ -125,6 +132,7 @@ local function navigate(player, session, action)
     assert(saved or count < 16, "Recover your saved drafts from the personal gauntlet before opening another editor.")
     session.base = saved and saved.base or FS.read(storage.computers[session.id], action.path)
     session.draft = saved and saved.draft or session.base
+    M.check_save(session, FS.read(storage.computers[session.id], action.path))
   end
   session.view, session.path = action.view, action.path
   session.notice = nil
@@ -144,10 +152,30 @@ function M.submit(player, session, c)
   end
   M.render(player)
 end
+-- Plain-data conflict decisions are independently engine-testable without a player.
+function M.check_save(session, current)
+  if current ~= session.base then session.conflict = current; return false end
+  session.conflict = nil
+  return true
+end
+function M.rebase(session, current)
+  assert(session.conflict ~= nil, "No conflict to review")
+  if current ~= session.conflict then
+    session.conflict = current
+    return false
+  end
+  session.base, session.conflict = current, nil
+  return true
+end
 function M.save(player, session, c, run)
   local source = find(root(player), "cc2_source").text
   assert(#source <= 262144, "program exceeds source limit")
-  assert(FS.read(c, session.path) == session.base, "File changed elsewhere. Your draft is retained; reopen after resolving the conflict.")
+  session.draft = source
+  if not M.check_save(session, FS.read(c, session.path)) then
+    session.notice = "File changed elsewhere. Review the current version, then Keep draft & rebase; nothing has been overwritten."
+    M.render(player)
+    return
+  end
   FS.write(c, session.path, source)
   session.base, session.draft = source, source
   local drafts = storage.drafts[player.index]
@@ -200,6 +228,11 @@ function M.event(event)
         session.draft = session.base
         if storage.drafts[player.index] then storage.drafts[player.index][session.id .. ":" .. session.path] = nil end
         M.close(player, true)
+      elseif name == "cc2_rebase" then
+        if M.rebase(session, FS.read(c, session.path)) then
+          session.notice = "Draft rebased. Review your edits, then Save."
+        else session.notice = "File changed again; review the refreshed current version before rebasing." end
+        M.render(player)
       elseif name == "cc2_recover" and c.personal then
         local drafts = storage.drafts[player.index] or {}
         for _, key in ipairs(U.keys(drafts)) do

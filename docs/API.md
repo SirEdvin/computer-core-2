@@ -2,7 +2,7 @@
 
 All programs have native safe Lua functions/libraries, `state` (durable plain table),
 `args` (startup arguments), `print` (terminal write), `require` (alias of os.require),
-and source-only `load`. No `game`, `script`, `remote`, filesystem IO, debug library,
+and source-only `load`. `defines` is a private copied table of engine constants. No `game`, `script`, `remote`, filesystem IO, debug library,
 bytecode dump or coroutine persistence is exposed to player programs.
 
 ## os
@@ -10,6 +10,7 @@ bytecode dump or coroutine persistence is exposed to player programs.
 - `getComputerID()`, `getComputerLabel()`, `setComputerLabel(label)`.
 - `date()` returns game ticks; `time()` returns hours on the legacy 25000-tick cycle.
 - `set(name, ...)`, `get(name)`, `clear(name)` store durable tuples, including nil holes.
+  `get` returns defensive copies: modify a returned table and call `set` to save it.
 - `pcall(fn, ...)` is protected Lua execution.
 - `register(name, fn)` declares a named handler at module scope. Alternatively return
   `{init=function(...) ... end, handler=function(...) ... end}`.
@@ -39,7 +40,7 @@ cannot be replaced or removed. Shell paths instead use terminal cwd.
 `readLeftSignals([wire])`, `readRightSignals([wire])`,
 `writeLeftSignals(signals)`, `writeRightSignals(signals)`.
 Aliases: `getLeftSignals`, `getRightSignals`, `setLeftSignals`, `setRightSignals`.
-Wire is `"red"` or `"green"`; omitted reads this computer's own outputs. Read/write shape:
+Wire is `"red"` / `"green"` or `defines.wire_type.red` / `.green`; omitted reads this computer's own outputs. Read/write shape:
 
 ```lua
 {{signal={type="item",name="iron-plate",quality="normal"},count=42}}
@@ -59,6 +60,10 @@ stopping/restarting discards messages from the old generation.
 `onBuiltComputer(name,...)` receives `{computerID,position,surface_index,autorun}`.
 `event.autorun(source,[path])` starts source on that new powered computer once;
 it does not accept functions. Do not store the transient autorun function in state.
+Built notifications are sent only to subscribed programs/extensions. If the shared
+queue is full, newest built notifications are dropped in deterministic computer-ID
+order; `getComputer(id).process.dropped_built` reports that program's dropped count.
+Explicit player sends still report a protected queue-full error.
 
 ## speaker (physical computers)
 

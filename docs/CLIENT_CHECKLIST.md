@@ -9,10 +9,13 @@ passed based on the playerless headless suite.
   legible layout at your resolution/UI scale; commands work with Enter and Execute.
 - Edit, Save, Save & run, Stop, clear, quoted file names and source-relative disk IO.
 - Unsaved close/escape/navigation warning; concurrent edit conflict does not overwrite.
+  Review the changed file and Keep draft & rebase; another intervening change
+  must refresh the conflict rather than overwrite silently.
   Cut power, walk away, disconnect or destroy the computer while editing; use gauntlet
   Recover drafts and inspect `/recovered` for retained source.
 - Ctrl+G and shortcut open personal computer after research with a character. Personal
   files remain private; no physical LAN/speaker APIs appear on the gauntlet.
+  Move away from a surface that is then deleted; personal files/state must survive.
 - Waypoint create/select/rename/delete, live coordinate camera preview, surface isolation.
 - Attach red/green circuit wires; run circuit.lua. Verify outputs including item quality.
 - `speaker.playNote`, named notes/instruments, volume and polyphony sound correct;

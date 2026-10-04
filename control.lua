@@ -33,7 +33,7 @@ script.on_event(defines.events.on_object_destroyed, function(event)
   if id then L.remove(id) end
 end)
 script.on_event(defines.events.on_pre_surface_deleted, function(event)
-  for _, id in ipairs(U.keys(storage.computers)) do if storage.computers[id].surface_index == event.surface_index then L.remove(id) end end
+  for _, id in ipairs(U.keys(storage.computers)) do if not storage.computers[id].personal and storage.computers[id].surface_index == event.surface_index then L.remove(id) end end
   for key in pairs(storage.waypoints) do if key:match(":" .. event.surface_index .. "$") then storage.waypoints[key] = nil end end
 end)
 script.on_event(defines.events.on_forces_merged, function(event)
