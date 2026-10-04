@@ -1,0 +1,32 @@
+name: Factorio engine regression
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  engine:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [base, expansion]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Download pinned official headless engine
+        run: |
+          curl --fail --location --retry 3 https://factorio.com/get-download/2.0.77/headless/linux64 -o "$RUNNER_TEMP/factorio.tar.xz"
+          tar -xJf "$RUNNER_TEMP/factorio.tar.xz" -C "$RUNNER_TEMP"
+          "$RUNNER_TEMP/factorio/bin/x64/factorio" --version
+      - name: Package and verify in the actual engine
+        env:
+          MODE: ${{ matrix.mode }}
+          FACTORIO_BIN: ${{ runner.temp }}/factorio/bin/x64/factorio
+        run: |
+          python3 tools/package.py
+          options=()
+          if [ "$MODE" = expansion ]; then options+=(--expansion); fi
+          python3 tests/run_engine.py --archive dist/computer_core_2_0.1.0.zip "${options[@]}"
