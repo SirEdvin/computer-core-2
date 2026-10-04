@@ -1,4 +1,19 @@
-# Computer Core 2
+# Computer Core 2 (ALPHA)
+
+**Experimental alpha 0.1.0 — not a stable release.** Back up your saves and use a
+fresh test world. Expect bugs and possible API/save-format changes before stability.
+No migration from legacy Computer Core saves or persisted closures is provided.
+
+The packaged mod passes real Factorio 2.0.77 base and expansion headless tests,
+including save/reload. This does **not** establish client acceptance: GUI layout and
+input, audible speakers, personal-computer surface deletion, robot-built externally
+wired blueprints, and multiplayer client joining remain unverified. Follow
+[the client checklist](docs/CLIENT_CHECKLIST.md) and report reproduction steps,
+Factorio version, enabled mods and relevant logs when encountering bugs.
+
+Only execute Lua programs you trust: the sandbox's data limits do not prevent an
+infinite loop from stalling the simulation. Persistent callbacks use named handlers
+and explicit serializable state, not the original mod's persisted closures.
 
 Programmable Lua computers for Factorio 2.0: a terminal, filesystem, circuit ports,
 wireless messaging, programmable speaker, personal gauntlet and waypoint manager.
