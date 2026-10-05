@@ -51,7 +51,7 @@ alias `computer_core`. No Factorio 0.16 save conversion or old bytecode import.
   GUI callbacks receive data (`userInput` / `output`, tick, optional player index),
   not persisted GUI objects. Extension code is reconstructed for each callback.
 - UI access requires gauntlet research, same force/surface and 10-tile range
-  (or ownership of the personal computer). The 0.2 workbench remains available without
+  (or ownership of the personal computer). The 0.1.1 workbench remains available without
   power for file/draft inspection; running programs and sending input require power.
   Program input is explicitly submitted with Send/Enter, not per-keystroke.
   Remote callers are trusted installed mods.

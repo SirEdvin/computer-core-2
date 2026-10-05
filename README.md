@@ -1,6 +1,6 @@
 # Computer Core 2 (ALPHA)
 
-**Experimental alpha 0.2.0 — not a stable release.** Back up your saves and use a
+**Experimental alpha 0.1.1 — not a stable release.** Back up your saves and use a
 fresh test world. Expect bugs and possible API/save-format changes before stability.
 No migration from legacy Computer Core saves or persisted closures is provided.
 
@@ -29,7 +29,7 @@ Use a fresh 2.0 world; old Computer Core saves are not supported. The two mods
 cannot be enabled together.
 
 1. Build the archive with `python3 tools/package.py`.
-2. Copy `dist/computer_core_2_0.2.0.zip` to your Factorio `mods` directory.
+2. Copy `dist/computer_core_2_0.1.1.zip` to your Factorio `mods` directory.
 3. Research Personal Computer and Computer. Craft a computer and connect power.
 4. Select a computer and press **Ctrl + left mouse button** to open its terminal.
    Stay within 10 tiles. Use **Ctrl + G** or the gauntlet shortcut for your personal computer.

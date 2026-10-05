@@ -1,4 +1,4 @@
-# Computer workbench 0.2
+# Computer workbench 0.1.1
 
 ## Interface
 
@@ -60,7 +60,7 @@ replaced simply to correct the wire drawing.
 
 ## Upgrade and packaging
 
-0.2.0 remains **ALPHA**. Configuration changes rebuild open interfaces while
+0.1.1 remains **ALPHA**. Configuration changes rebuild open interfaces while
 retaining sessions/drafts. Existing source snapshots/programs are not restarted.
 No old Computer Core save migration is added.
 
