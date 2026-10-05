@@ -1,4 +1,5 @@
 local examples=require("examples")
+local gui_harness=require("gui_harness")
 local GUI=require("__computer_core_2__.scripts.gui")
 local function call(method, ...) return remote.call("computer_core_2", method, ...) end
 local function check(name, condition)
@@ -48,6 +49,7 @@ return {
 ]]
 script.on_init(function()
   storage.checks = 0
+  gui_harness.run(check)
   local editor={base='old',draft='my changes'}
   check('editor detects conflict without losing draft',not GUI.check_save(editor,'other changes') and editor.draft=='my changes')
   check('editor rebase rejects intervening file changes',not GUI.rebase(editor,'newer changes') and editor.base=='old' and editor.draft=='my changes')
@@ -124,6 +126,20 @@ script.on_init(function()
   storage.player_index = player.index
   check("terminal opens", call('open', a, player.index))
   check("terminal GUI exists", player.gui.screen.cc2_root ~= nil)
+  check('native workbench fits display',player.gui.screen.cc2_root.style.width*player.display_scale<=player.display_resolution.width and player.gui.screen.cc2_root.style.height*player.display_scale<=player.display_resolution.height)
+  check('native program input starts',call('run',a,examples.input,'input-example'))
+  gui(player,'cc2_input',defines.events.on_gui_text_changed,'whole native message')
+  check('native input typing does not dispatch',data(a).state.messages==0)
+  gui(player,'cc2_send_input')
+  check('native input Send dispatches once',data(a).state.messages==1 and data(a).state.last_input=='whole native message')
+  gui(player,'cc2_stop')
+  gui(player,'cc2_files')
+  gui(player,'cc2_new_path',defines.events.on_gui_text_changed,'/native-file.lua')
+  gui(player,'cc2_new_file')
+  gui(player,'cc2_source',defines.events.on_gui_text_changed,"term.write('native file browser')")
+  gui(player,'cc2_save')
+  check('native file browser saves source',data(a).fs['/native-file.lua'].text=="term.write('native file browser')")
+  gui(player,'cc2_console')
   gui(player,'cc2_command',defines.events.on_gui_text_changed,'edit /gui.lua')
   gui(player,'cc2_command',defines.events.on_gui_confirmed)
   check("editor opens", find(player.gui.screen.cc2_root,'cc2_source') ~= nil)
@@ -284,11 +300,21 @@ script.on_init(function()
     step=function() saved.value=saved.value+1; os.wait('step',0.1) end
   }]],'alias'))
   storage.examples={}
-  for i,name in ipairs({'counter','receiver','sender','circuit'}) do
+  for i,name in ipairs({'counter','receiver','sender','circuit','publish','threshold','input','logger'}) do
     local id=spawn({i*6,-16})
     storage.examples[name]=id
-    check('shipped example '..name,call('run',id,examples[name],'/examples/'..name..'.lua'))
+    check('repository example '..name,call('run',id,examples[name],'/examples/'..name..'.lua'))
   end
+  for _,name in ipairs({'threshold','logger','circuit'}) do
+    local ports=call('getPorts',storage.examples[name])
+    local source=surface.create_entity{name='constant-combinator',position={ports.left.position.x-3,ports.left.position.y},force='player'}
+    if name=='threshold' then storage.threshold_source=source end
+    source.get_or_create_control_behavior().add_section().set_slot(1,{value={type='item',name='iron-plate',quality='normal',comparator='='},min=42})
+    local wire=name=='logger' and defines.wire_connector_id.circuit_green or defines.wire_connector_id.circuit_red
+    check('example '..name..' connected input',source.get_wire_connector(wire,true).connect_to(ports.left.get_wire_connector(wire,true)))
+  end
+  call('input',storage.examples.input,'hello from example test')
+  check('repository input program delivers whole messages',data(storage.examples.input).state.messages==1 and data(storage.examples.input).fs['/last-input.txt'].text=='hello from example test')
   -- Fill the real shared queue with player-source messages to an unpowered
   -- listener. The next lifecycle tick must not throw while announcing new builds.
   storage.queue_sink=spawn({-24,-16})
@@ -336,7 +362,13 @@ script.on_event(defines.events.on_tick,function()
   elseif game.tick==15 then
     check('wireless delivery',data(b).state.messages==1 and data(b).state.message.value==7)
     check('shipped sender/receiver delivery',data(storage.examples.receiver).state.received==1)
-    check('shipped circuit callback',data(storage.examples.circuit).state.samples>0)
+    check('repository circuit callback',data(storage.examples.circuit).state.samples>0)
+    check('repository circuit republishes real input',data(storage.examples.circuit).outputs.right[1].signal.name=='iron-plate' and data(storage.examples.circuit).outputs.right[1].count==42)
+    check('repository publisher emits counter signal',data(storage.examples.publish).outputs.right[1].signal.name=='signal-C' and data(storage.examples.publish).outputs.right[1].count==1)
+    check('repository threshold sees inventory and publishes request',data(storage.examples.threshold).state.last_count==42 and data(storage.examples.threshold).outputs.right[1].count==1)
+    local threshold_control=storage.threshold_source.get_or_create_control_behavior()
+    threshold_control.get_section(threshold_control.sections_count).set_slot(1,{value={type='item',name='iron-plate',quality='normal',comparator='='},min=142})
+    check('repository logger reads green network',data(storage.examples.logger).fs['/signal-log.txt'].text:find('1 signal types',1,true)~=nil)
     check('timer order and cancellation',data(storage.timer_test).state.order=='12')
     local id=spawn({0,8})
     storage.built_id=id
@@ -365,7 +397,14 @@ script.on_event(defines.events.on_tick,function()
     check('extension message/built/output events survive reload',device.message==7 and device.built==storage.built_id and device.printed)
     check('captured locals never carry between dispatches',data(storage.closure).state.volatile==1 and data(storage.closure).state.total>=11)
     check('nested library and alias survive reload',data(storage.alias).state.value>=15)
-    check('shipped counter survives reload',data(storage.examples.counter).state.count>=11)
+    check('repository counter survives reload',data(storage.examples.counter).state.count>=11)
+    check('repository publisher counter survives reload',data(storage.examples.publish).state.count>=2)
+    check('repository threshold suppresses fulfilled request after reload',data(storage.examples.threshold).state.last_count==142 and #data(storage.examples.threshold).outputs.right==0)
+    local input=call('getPorts',storage.examples.threshold).left
+    local network=input.get_circuit_network(defines.wire_connector_id.circuit_red)
+    check('threshold network remained wired across reload',network and network.signals[1].count==142)
+    check('repository input durable state survives reload',data(storage.examples.input).state.messages==1 and data(storage.examples.input).state.last_input=='hello from example test')
+    check('repository logger retains history across reload',#data(storage.examples.logger).state.history>=2)
     check('no duplicate delivery',data(b).state.messages==1)
     if reloaded then check('fresh runtime reconstructed',storage.stage==2) end
     -- Removing a surface must remove every composite child and computer.

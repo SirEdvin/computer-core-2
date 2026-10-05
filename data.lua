@@ -1,4 +1,5 @@
 -- Derive engine-owned schemas from the pinned base prototypes; retain upstream art.
+require("scripts.gui_styles")
 local prefix = "__computer_core_2__/graphics/"
 local blank = {filename = prefix .. "blank.png", width = 1, height = 1}
 local computer = table.deepcopy(data.raw["electric-energy-interface"]["electric-energy-interface"])
@@ -10,6 +11,7 @@ computer.minable = {mining_time = 2, result = "computer-item"}
 computer.max_health = 250
 computer.collision_box = {{-1.2, -0.65}, {1.2, 0.65}}
 computer.selection_box = {{-1.5, -1}, {1.5, 1}}
+computer.selection_priority = 50
 computer.energy_source = {type = "electric", usage_priority = "primary-input", buffer_capacity = "5MJ", input_flow_limit = "300kW", output_flow_limit = "0kW"}
 computer.energy_production = "0kW"
 computer.energy_usage = "50kW"
@@ -22,6 +24,13 @@ port.flags = {"placeable-player", "player-creation", "placeable-off-grid", "not-
 port.collision_box = {{0, 0}, {0, 0}}
 port.collision_mask = {layers = {}}
 port.selection_box = {{-0.4, -0.4}, {0.4, 0.4}}
+port.selection_priority = 100
+-- These entities sit directly on the artwork's legs, not on a vanilla
+-- combinator. Inherited directional wire points displaced both wire ends.
+port.circuit_wire_connection_points = {}
+for i = 1, 4 do
+  port.circuit_wire_connection_points[i] = {wire = {red = {0, 0}, green = {0, 0}}, shadow = {red = {0, 0}, green = {0, 0}}}
+end
 port.sprites = {north = blank, east = blank, south = blank, west = blank}
 port.activity_led_sprites = table.deepcopy(port.sprites)
 port.activity_led_light = {intensity = 0, size = 1}

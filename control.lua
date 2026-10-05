@@ -16,6 +16,7 @@ script.on_configuration_changed(function()
   initialize()
   -- Existing source snapshots continue; each dispatch reconstructs its runtime.
   for _, c in pairs(storage.computers) do if c.sub then L.ensure(c) end end
+  for _, player in pairs(game.players) do if storage.sessions[player.index] then GUI.render(player) end end
 end)
 script.on_event(defines.events.on_tick, function()
   L.tick()
@@ -85,6 +86,7 @@ script.on_event(defines.events.on_gui_opened, function(event)
 end)
 script.on_event({defines.events.on_gui_click, defines.events.on_gui_text_changed, defines.events.on_gui_confirmed, defines.events.on_gui_selection_state_changed}, GUI.event)
 script.on_event(defines.events.on_gui_closed, GUI.closed)
+script.on_event({defines.events.on_player_display_resolution_changed, defines.events.on_player_display_scale_changed}, GUI.resize)
 script.on_event(defines.events.on_player_setup_blueprint, function(event)
   local player = game.get_player(event.player_index)
   local blueprint = player.blueprint_to_setup
