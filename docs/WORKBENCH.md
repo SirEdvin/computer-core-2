@@ -1,9 +1,9 @@
-# Computer workbench 0.1.1
+# Computer workbench 0.1.2
 
 ## Interface
 
 The workbench uses Factorio's native frames, titlebar drag handle, close icon,
-confirm/danger buttons, scroll panes and monospace editor/output. There is no new
+confirm/danger buttons, scroll panes and core-font editor/output. There is no new
 UI library, copied mod code or copied artwork.
 
 - **Terminal:** shell commands, streaming output, and explicitly submitted program input.
@@ -60,7 +60,7 @@ replaced simply to correct the wire drawing.
 
 ## Upgrade and packaging
 
-0.1.1 remains **ALPHA**. Configuration changes rebuild open interfaces while
+0.1.2 remains **ALPHA**. Configuration changes rebuild open interfaces while
 retaining sessions/drafts. Existing source snapshots/programs are not restarted.
 No old Computer Core save migration is added.
 
@@ -72,6 +72,10 @@ Lua examples are repository files for copying into an in-game computer manually.
 
 - Real pinned Factorio 2.0.77 base/expansion runs of the actual ZIP, with save/reload
   in a separate process and real wired circuit input/output for examples.
+- Font regression: 0.1.1 referenced nonexistent `default-mono`, which headless
+  loading did not reject. 0.1.2 uses the declared core `default` font. The new
+  regression rejects every explicit custom-style font lacking a `data.raw.font`
+  prototype; it fails against the original 0.1.1 ZIP before the fix.
 - Data-stage regression assertions for all four zero-relative red/green wire points,
   wire shadows, selection priority and the native style names used by the workbench.
 - Table-backed GUI interaction contracts: rendering/navigation, error/success feedback,
