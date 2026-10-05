@@ -50,8 +50,11 @@ alias `computer_core`. No Factorio 0.16 save conversion or old bytecode import.
   `on_gui_text_changed` and `after_text_print`, plus custom wireless event names.
   GUI callbacks receive data (`userInput` / `output`, tick, optional player index),
   not persisted GUI objects. Extension code is reconstructed for each callback.
-- UI access requires gauntlet research, same force/surface, power and 10-tile range
-  (or ownership of the personal computer). Remote callers are trusted installed mods.
+- UI access requires gauntlet research, same force/surface and 10-tile range
+  (or ownership of the personal computer). The 0.1.1 workbench remains available without
+  power for file/draft inspection; running programs and sending input require power.
+  Program input is explicitly submitted with Send/Enter, not per-keystroke.
+  Remote callers are trusted installed mods.
 - A conflicting editor save is rejected without overwriting someone else's changes.
   Forced closure retains bounded drafts recoverable from the personal gauntlet.
   Review the current file and choose Keep draft & rebase to accept that version as

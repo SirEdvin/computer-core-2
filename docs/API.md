@@ -28,6 +28,8 @@ bytecode dump or coroutine persistence is exposed to player programs.
 `addInputListener(name)` and `addOutputListener(name)` return stable IDs;
 `removeListener(id)`. Input handler receives `{listenerID,userInput,player_index}`;
 output handler receives `{listenerID}`. Output notifications are deferred to ticks.
+The workbench input field dispatches once on Send/Enter, not while typing; it requires
+a powered running program. `term.setInput` and trusted remote `input` retain their APIs.
 Do not endlessly print from an output listener.
 
 `disk.readFile(path)`, `writeFile(path,...)`, `appendFile(path,...)`,

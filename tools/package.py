@@ -15,8 +15,8 @@ def main():
     args = parser.parse_args()
     info = json.loads((ROOT / 'info.json').read_text())
     prefix = f'{info["name"]}_{info["version"]}'
-    files = [ROOT / name for name in ['info.json', 'data.lua', 'control.lua', 'LICENSE', 'README.md']]
-    for directory in ['scripts', 'graphics', 'locale', 'docs', 'examples']:
+    files = [ROOT / name for name in ['info.json', 'data.lua', 'control.lua', 'LICENSE']]
+    for directory in ['scripts', 'graphics', 'locale']:
         files.extend(path for path in (ROOT / directory).rglob('*') if path.is_file())
     args.output.mkdir(parents=True, exist_ok=True)
     archive = args.output / f'{prefix}.zip'
@@ -29,7 +29,7 @@ def main():
     with zipfile.ZipFile(archive) as check:
         assert check.testzip() is None, 'Corrupt archive'
         assert json.loads(check.read(f'{prefix}/info.json')) == info
-        assert not any('/tests/' in name or '/.git/' in name for name in check.namelist())
+        assert not any('/tests/' in name or '/.git/' in name or '/docs/' in name or '/examples/' in name or name.endswith('/README.md') for name in check.namelist())
         count = len(check.namelist())
     digest = hashlib.sha256(archive.read_bytes()).hexdigest()
     archive.with_suffix('.zip.sha256').write_text(f'{digest}  {archive.name}\n')

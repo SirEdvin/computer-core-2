@@ -12,6 +12,7 @@ import signal
 import threading
 import time
 import tempfile
+import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -41,7 +42,18 @@ def main():
     test_info = json.loads((ROOT / 'tests/mod/info.json').read_text())
     test_dir = base / 'mods' / f'{test_info["name"]}_{test_info["version"]}'
     shutil.copytree(ROOT / 'tests/mod', test_dir, dirs_exist_ok=True)
-    # Exercise the exact shipped example sources in the actual sandbox.
+    # Exercise repository-only examples against the packaged runtime.
+    if args.archive:
+        with zipfile.ZipFile(args.archive) as archive:
+            gui_source = archive.read(f"{mod_name}/scripts/gui.lua").decode()
+            assert json.loads(archive.read(f"{mod_name}/info.json")) == info
+            assert not any("/docs/" in name or "/examples/" in name or name.endswith("/README.md") for name in archive.namelist())
+    else:
+        gui_source = (ROOT / "scripts/gui.lua").read_text()
+    sep = "="
+    while f"]{sep}]" in gui_source:
+        sep += "="
+    (test_dir / "gui_source.lua").write_text(f"return [{sep}[{gui_source}]{sep}]\n")
     fixtures = ['return {']
     for path in sorted((ROOT / 'examples').glob('*.lua')):
         source = path.read_text()

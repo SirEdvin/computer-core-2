@@ -1,6 +1,6 @@
 # Computer Core 2 (ALPHA)
 
-**Experimental alpha 0.1.0 — not a stable release.** Back up your saves and use a
+**Experimental alpha 0.1.1 — not a stable release.** Back up your saves and use a
 fresh test world. Expect bugs and possible API/save-format changes before stability.
 No migration from legacy Computer Core saves or persisted closures is provided.
 
@@ -29,16 +29,23 @@ Use a fresh 2.0 world; old Computer Core saves are not supported. The two mods
 cannot be enabled together.
 
 1. Build the archive with `python3 tools/package.py`.
-2. Copy `dist/computer_core_2_0.1.0.zip` to your Factorio `mods` directory.
+2. Copy `dist/computer_core_2_0.1.1.zip` to your Factorio `mods` directory.
 3. Research Personal Computer and Computer. Craft a computer and connect power.
 4. Select a computer and press **Ctrl + left mouse button** to open its terminal.
    Stay within 10 tiles. Use **Ctrl + G** or the gauntlet shortcut for your personal computer.
-5. Enter `help`, `help apis` or `help os`. Create a script with `edit /counter.lua`,
+5. Use **Files → New file** to open the editor, or enter `help`, `help apis` or `help os`
+   in the Terminal. Create a script with `edit /counter.lua`,
    paste [examples/counter.lua](examples/counter.lua), then choose Save & run.
 
 The gauntlet requires a character and research; it has no physical circuit ports
 or speaker. Computer labels expose same-force/same-surface files under
 `/mnt/<label>`. Programs pause without power; overdue timers fire after power returns.
+The workbench stays open while unpowered so files/drafts remain inspectable; starting
+programs and sending input require power. Program input is sent with Send/Enter,
+not on each keystroke. The window adapts to resolution/UI-scale changes.
+
+See [workbench design and verification](docs/WORKBENCH.md) for the UI changes,
+wire-anchor fix, native-client acceptance limits and reference mods.
 
 ## Durable programs, not serialized closures
 
@@ -62,6 +69,8 @@ are reconstructed before every dispatch; captured locals do not carry between
 callbacks. Keep module scope free of side effects and state mutations. Pure libraries
 loaded with `os.require` are snapshotted with the running program.
 
+Guides and Lua examples are **repository-only**, excluded from the mod ZIP.
+Start with [practical use cases](docs/USE_CASES.md).
 See [API reference](docs/API.md), [migration contract](docs/MIGRATION.md),
 [client verification checklist](docs/CLIENT_CHECKLIST.md) and [examples](examples/).
 
@@ -80,6 +89,8 @@ Tests create isolated mod/config/save directories, run the actual engine, save a
 30 and resume that save. Logs and a machine-readable `result.json` remain in the printed
 output directory. `--output <directory>` chooses its location. GUI tests require a
 client-created player and are explicitly skipped in playerless headless worlds.
+Table-backed GUI interaction contracts and pure resolution/UI-scale layout rules
+are tested headlessly; these are not native rendering or real mouse/keyboard tests.
 Client appearance, controls, audible playback and multiplayer joining need the checklist;
 headless success is not proof of those checks.
 

@@ -29,4 +29,5 @@ jobs:
           python3 tools/package.py
           options=()
           if [ "$MODE" = expansion ]; then options+=(--expansion); fi
-          python3 tests/run_engine.py --archive dist/computer_core_2_0.1.0.zip "${options[@]}"
+          archive="dist/$(jq -r ' .name + "_" + .version + ".zip" ' info.json)"
+          python3 tests/run_engine.py --archive "$archive" "${options[@]}"
