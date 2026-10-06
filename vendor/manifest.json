@@ -342,11 +342,12 @@
       "revision": "720773ec68239504cb134cd4f9b7e8bb66a1408e",
       "source_url": "https://github.com/Ocawesome101/recrafted/blob/720773ec68239504cb134cd4f9b7e8bb66a1408e/data/computercraft/lua/rom/apis/window.lua",
       "source_sha256": "87261a0d4f3170de8ae72bee8d8be7d345ab5d74626b758c60157512339c6ed0",
-      "sha256": "87261a0d4f3170de8ae72bee8d8be7d345ab5d74626b758c60157512339c6ed0",
+      "sha256": "7dcaf89aa3f92f23441aaeaa3c42bf23675857b771891f03d4d7e2d891111b6a",
       "license": "MIT",
       "copyright": "Copyright (c) 2022 Ocawesome101",
       "license_path": "vendor/recrafted/LICENSE",
-      "guest_path": "/rc/apis/window.lua"
+      "guest_path": "/rc/apis/window.lua",
+      "patch": "vendor/patches/18-recrafted-window-row-redraw.patch"
     },
     {
       "path": "vendor/recrafted/rom/completions/alias.lua",
@@ -1110,6 +1111,11 @@
       "path": "vendor/patches/17-recrafted-term-paste.patch",
       "target": "vendor/recrafted/rom/startup/15_term.lua",
       "reason": "Preserve complete existing line suffix during paste insertion"
+    },
+    {
+      "path": "vendor/patches/18-recrafted-window-row-redraw.patch",
+      "target": "vendor/recrafted/rom/apis/window.lua",
+      "reason": "Redraw only the modified row on visible write/clearLine, preserve cursor/color/blink and propagate one changed palette entry instead of recursively restoring all sixteen through every ancestor"
     }
   ],
   "excluded": [

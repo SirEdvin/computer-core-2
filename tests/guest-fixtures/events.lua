@@ -16,10 +16,20 @@ assert(os.pullEventRaw("never") == "terminate")
 assert(not pcall(os.queueEvent, "bad", 0/0))
 assert(not pcall(os.startTimer, math.huge))
 assert(not pcall(os.startTimer, -1))
-for i = 1, 256 do os.queueEvent("flood", i) end
+-- Filling/draining a maximum queue may span native-work credits now that
+-- instruction quanta are larger. Recover only that explicit quota refusal;
+-- retrying burns guest instructions until the next scheduler tick renews it.
+local function event_call(fn, ...)
+  while true do
+    local ok, first, second = pcall(fn, ...)
+    if ok then return first, second end
+    assert(type(first) == "string" and first:find("event work limit exceeded", 1, true), first)
+  end
+end
+for i = 1, 256 do event_call(os.queueEvent, "flood", i) end
 assert(not pcall(os.queueEvent, "overflow"))
 for i = 1, 256 do
-  local event, sequence = os.pullEventRaw()
+  local event, sequence = event_call(os.pullEventRaw)
   assert(event == "flood" and sequence == i)
 end
 local marker = {value = "preserved"}

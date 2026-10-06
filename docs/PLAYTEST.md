@@ -1,6 +1,6 @@
-# 0.2.0 alpha playtest
+# 0.2.1 alpha playtest
 
-Experimental terminal-OS playtest guidance for the intended **0.2.0 alpha** build;
+Experimental terminal-OS playtest guidance for the **0.2.1 alpha** build;
 not a publication announcement or stable acceptance claim. Graphical/client tests
 below belong to the playtester and are **not yet passed**. See
 [known limitations](KNOWN_LIMITATIONS.md) before upgrading.
@@ -10,7 +10,7 @@ below belong to the playtester and are **not yet passed**. See
 1. **Back up your saves and keep an untouched copy.** Prefer a fresh test world;
    upgrade only a separate copy of an existing Computer Core 2 save.
 2. Use Factorio **2.0.77 or newer**. Copy the supplied
-   `computer_core_2_0.2.0.zip` into Factorio's `mods` directory and enable Computer
+   `computer_core_2_0.2.1.zip` into Factorio's `mods` directory and enable Computer
    Core 2. Do not enable the original `computer_core` alongside it. Ensure all
    multiplayer clients have the same mod version and startup settings.
 3. Verify the archive/version supplied by the maintainer; this document does not
@@ -18,6 +18,9 @@ below belong to the playtester and are **not yet passed**. See
    repository packaging command is `python3 tools/package.py`.
 4. **Do not downgrade a migrated save.** To return to 0.1.x, restore the untouched
    backup with its matching mod version, not the newly saved upgraded world.
+5. Updating from 0.2.0: save all important files, then reboot each computer once.
+   Existing guests retain their compiled OS modules until reboot. The upgrade
+   does not automatically discard editor drafts; Reboot does discard unsaved buffers.
 
 ## Open a computer
 
@@ -36,9 +39,9 @@ below belong to the playtester and are **not yet passed**. See
   do not assume every raw OS key or text encoding is supported.
 
 Click the capture field beneath the grid to type or paste; accepted text is sent
-immediately and the field clears. Press Enter there to submit. The navigation
-buttons are a fallback if Factorio intercepts a custom shortcut. Use **Ctrl+M**
-or **Ctrl / menu**, then type **s** to save or **e** to exit the advanced editor.
+immediately and the field clears. Press Enter there to submit. Navigation uses
+keyboard shortcuts; the fallback button row has been removed. Use **Ctrl+M**,
+then type **s** to save or **e** to exit the advanced editor.
 Clicking a terminal cell sends its one-based position; drag/physical release are
 not implemented. Close preserves execution. Reboot discards unsaved guest buffers
 but keeps saved files; Shutdown pauses the computer until Reboot. This is an

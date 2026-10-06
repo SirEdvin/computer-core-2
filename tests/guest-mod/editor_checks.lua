@@ -42,7 +42,7 @@ local function pump(vm, predicate)
     end
     -- The parent shell polls timers while its forked editor is alive, so the
     -- root need not wait. Verify the actual editor coroutine's suspension.
-    if (vm.wait or editor_waiting(vm)) and predicate() then report(turns); return end
+    if (vm.wait or editor_waiting(vm)) and predicate() then report(turns); return turns, vm.instructions - instructions end
   end
   report(40000)
   for i, row in ipairs(vm.display.lines) do log('CC2 EDITOR FAILURE ROW ' .. i .. ' ' .. row.text) end
@@ -86,7 +86,9 @@ function M.initial(vm, check)
   pump(vm, function() return footer(vm, 'Press Control for menu') end)
   check('actual basic editor starts through upstream shell', true)
   type_text(vm, 'b')
-  pump(vm, function() return vm.display.lines[1].text:sub(1, 1) == 'b' end)
+  local turns, instructions = pump(vm, function() return vm.display.lines[1].text:sub(1, 1) == 'b' end)
+  check('basic editor typing avoids nested full-window redraw amplification', instructions <= vm.display.rows * 4096
+    and turns <= math.ceil(vm.display.rows * 4096 / 1024) + 1)
   send(vm, 'key', 263, false)
   send(vm, 'paste', 'xy\r\nz\n')
   send(vm, 'char', '!')

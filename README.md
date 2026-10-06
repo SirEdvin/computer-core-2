@@ -1,4 +1,4 @@
-# Computer Core 2 — experimental 0.2.0 alpha
+# Computer Core 2 — experimental 0.2.1 alpha
 
 A terminal-only Lua computer for Factorio 2.0.77+, using a pinned Recrafted BIOS,
 shell and editors inside a durable guest VM. Existing world artwork is retained.
@@ -10,14 +10,14 @@ are still unverified and belong to the playtester.**
 
 ## Install and use
 
-1. Copy the supplied `computer_core_2_0.2.0.zip` into Factorio's `mods` directory.
+1. Copy the supplied `computer_core_2_0.2.1.zip` into Factorio's `mods` directory.
    Do not enable the original `computer_core` simultaneously.
 2. Research Personal Computer, then Computer. Supply power to a placed computer.
 3. Stay within ten tiles and Ctrl+left-click its body, or Ctrl+G for the private
    personal gauntlet (requires research and a character).
 4. Click the capture field below the grid. Text/paste sends immediately; Enter
-   submits. Navigation buttons provide a fallback for intercepted shortcuts.
-5. Type `edit /hello.lua`. Enter `print("Hello")`; Ctrl+M or **Ctrl / menu** opens
+   submits. Use keyboard shortcuts for navigation; the fallback button row is removed.
+5. Type `edit /hello.lua`. Enter `print("Hello")`; Ctrl+M opens
    the editor menu, then type **s** to save or **e** to exit. Run `/hello.lua`.
 
 Close preserves the running OS. Reboot discards unsaved guest buffers, not saved
@@ -25,6 +25,9 @@ files. Shutdown stops dispatch until reboot. Power loss pauses execution; overdu
 timers become due after power returns. Physical viewers share one input stream.
 
 Read [playtest steps/checklist](docs/PLAYTEST.md) and [known limitations](docs/KNOWN_LIMITATIONS.md).
+When updating from 0.2.0, save your files, then reboot each computer once to load
+the optimized OS window code. Upgrading does not discard a running editor draft
+or silently replace its suspended code; Reboot still discards unsaved buffers.
 Printable ASCII is the initial render surface; other bytes show fallback glyphs
 without altering file bytes. Synthetic releases, no drag, fixed background palette
 and gradual large-grid redraw are documented alpha limitations. Boot/editor

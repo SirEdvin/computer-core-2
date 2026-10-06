@@ -2,7 +2,7 @@
 local U = require('scripts.util')
 local L = require('scripts.lifecycle')
 local R = require('scripts.os_runtime')
-local Keys = require('scripts.terminal_keys')
+
 local Palette = require('scripts.terminal_palette')
 local M = {}
 local cache = {} -- Ephemeral rendering cache. Never an execution/persistence root.
@@ -60,6 +60,10 @@ function M.render(player)
   local display=c.guest and c.guest.display
   status(frame,c,session)
   if not display then return end
+  local blink=display.blink and math.floor(game.tick/30)%2==0
+  local view=cache[player.index]
+  if view and view.source==display and view.revision==display.revision and view.blink==blink then return end
+  if view and view.source~=display then view.revision=nil; view.sweep_revision=nil end
   local pane=frame.cc2_scroll
   local grid=pane.cc2_cells
   if not grid or grid.column_count~=display.columns or #grid.children~=display.columns*display.rows then
@@ -72,13 +76,14 @@ function M.render(player)
     end
     cache[player.index]={cells={},cursor=1}
   end
-  local view=cache[player.index]
+  view=cache[player.index]
   if not view then view={cells={},cursor=1}; cache[player.index]=view end
+  view.source=display
   local children=grid.children
-  local blink=display.blink and math.floor(game.tick/30)%2==0
   -- A bounded refresh sweep avoids repainting a maximum-size grid every tick.
   for _=1,math.min(512,#children) do
     local i=view.cursor
+    if i==1 then view.sweep_revision=display.revision; view.sweep_blink=blink end
     local x=(i-1)%display.columns+1
     local y=math.floor((i-1)/display.columns)+1
     local line=display.lines[y]
@@ -99,6 +104,7 @@ function M.render(player)
       view.cells[i]=signature
     end
     view.cursor=i%#children+1
+    if view.cursor==1 then view.revision=view.sweep_revision; view.blink=view.sweep_blink end
   end
 end
 function M.open(player,c)
@@ -121,10 +127,9 @@ function M.open(player,c)
   pane.style.maximal_width=math.max(160,math.floor(player.display_resolution.width/scale)-100)
   pane.style.maximal_height=math.max(120,math.floor(player.display_resolution.height/scale)-260)
   local input=frame.add{type='textfield',name='cc2_capture',text='',lose_focus_on_confirm=false,
-    tooltip='Type/paste here to send terminal text immediately. Enter submits. Ctrl+M opens the editor menu; the buttons work if shortcuts are intercepted.'}
+    tooltip='Type/paste here to send terminal text immediately. Enter submits. Ctrl+M opens the editor menu. Navigation uses keyboard shortcuts.'}
   input.style.horizontally_stretchable=true
-  local keys=frame.add{type='flow',name='cc2_keys',direction='horizontal'}
-  for _,key in ipairs(Keys.buttons) do keys.add{type='button',caption=key.caption,tags={cc2_key=key.code}} end
+
   player.opened=frame
   M.render(player)
   input.focus()
@@ -176,7 +181,7 @@ function M.event(event)
     elseif element.name=='cc2_reboot' then R.reboot(c); session.notice=nil
     elseif element.name=='cc2_shutdown' then R.shutdown(c)
     elseif element.name=='cc2_terminate' then send(player,c,session,'terminate')
-    elseif tags.cc2_key then tap(player,c,session,tags.cc2_key)
+
     elseif tags.cc2_cell then
       local button=event.button==defines.mouse_button_type.right and 2 or event.button==defines.mouse_button_type.middle and 3 or 1
       if send(player,c,session,'mouse_click',button,tags.x,tags.y) then send(player,c,session,'mouse_up',button,tags.x,tags.y) end

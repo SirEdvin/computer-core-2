@@ -1,4 +1,4 @@
-# Known limitations — intended 0.2.0 alpha
+# Known limitations — 0.2.1 alpha
 
 This is an experimental, breaking terminal-OS playtest, **not full CraftOS** and
 not a stable release. This document does not certify completed source integration,
@@ -25,8 +25,8 @@ Follow [PLAYTEST.md](PLAYTEST.md) on a fresh world or backed-up save copy.
 ## Input, presentation and shared sessions
 
 - Text/paste enters through the focused capture field below the terminal. Enter
-  uses GUI confirmation; navigation uses custom inputs and fallback buttons.
-  Ctrl+M or the **Ctrl / menu** button opens the upstream editor menu. Physical
+  uses GUI confirmation; navigation uses custom inputs. The fallback button row
+  is removed. Ctrl+M opens the upstream editor menu. Physical
   key release/held state and mouse drag are not captured: each key/cell click is
   followed by a synthetic release. Hold/repeat and shortcut interception remain
   client-unverified; custom inputs deliberately do not consume world controls.
@@ -52,6 +52,13 @@ Follow [PLAYTEST.md](PLAYTEST.md) on a fresh world or backed-up save copy.
   the playtester does not mean they have passed.
 
 ## Resource and upgrade caveats
+
+- Updating from 0.2.0 does not replace already-compiled guest modules or discard
+  suspended editor drafts. Save files and reboot each computer once to load the
+  optimized window code. Reboot discards unsaved buffers, not saved files.
+- Per-computer instruction and collection quanta are now 1024 rather than 256;
+  their aggregate tick caps remain 4096. A few computers get faster service;
+  many continuously busy computers still share those same aggregate caps.
 
 - Timers use simulation time: power loss stops guest dispatch, but overdue timers
   become due after power returns; their remaining duration is not frozen.

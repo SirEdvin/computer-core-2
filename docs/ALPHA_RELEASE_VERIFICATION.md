@@ -37,3 +37,37 @@ base/expansion output directories contain individual logs/process records.
 See PLAYTEST.md and KNOWN_LIMITATIONS.md for client checks and known alpha issues.
 Remaining OpenSpec gates stay unchecked; the original complete gate applies to a
 validated release rather than this explicitly authorized alpha.
+
+## 0.2.1 responsiveness hotfix
+
+- Archive: `computer_core_2_0.2.1.zip`, 141 files.
+- SHA-256: `ea3650f2681667d1b8852b0502ef14eda837cb4800ec9bf02bb2bf0164e96335`.
+- Exact packaged Factorio 2.0.77 base and expansion checks: 358 initial and
+  490 cumulative checks per variant; all six phases clean, no signals or kills.
+- Shutdown controller: seven tests passed. Resource verifier: the same 78 resources,
+  12 compiler modules and 64 guest files, now 17 reproducible patches.
+- Real nested-window regression asserts one row blit per write/clearLine, retained
+  cursor/color/blink, hidden-write buffering/reveal and one propagated palette
+  entry per palette mutation. The new window patch reproduces installed bytes
+  exactly from the pinned original, with zero fuzz.
+- The same basic-editor single-character fixture went from 1233 scheduler ticks /
+  315648 instructions in the packaged 0.2.0 baseline to 40 ticks / 40960 instructions:
+  30.825 times fewer dispatch ticks. This is a simulated scheduler fixture, not
+  a graphical latency measurement. A geometry-scaled work regression guards it.
+- Instruction/collection quanta are 1024 per computer; aggregate caps stay 4096.
+  Shared-credit, same-tick/reload refusal and 64-busy-computer fairness checks pass.
+  Queue flood tests now explicitly recover native event-work quota refusals rather
+  than assuming instruction preemption always occurs first.
+- The fallback key button row is removed. Unchanged GUI sweeps are skipped only
+  after a complete revision/blink-consistent sweep; replacement guest displays
+  invalidate the old sweep marker. These presentation changes are source-reviewed,
+  not native GUI/client acceptance.
+- Save files and reboot each computer after updating: existing suspended guests
+  retain previously compiled OS modules until reboot. No automatic reboot discards
+  unsaved buffers on upgrade.
+
+Pre-fix 0.2.0 and row-only source evidence remain retained. Initial hotfix runs
+failed outdated hard-coded scheduling assumptions, then the intentionally dense
+queue-flood fixture encountered the unchanged native-event work quota. Both
+failures remain failures in their original logs; corrected packaged reruns pass.
+Compiler/resource and actual multiplayer/client responsiveness remain provisional.

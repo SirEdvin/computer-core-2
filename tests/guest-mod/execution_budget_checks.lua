@@ -4,6 +4,8 @@ local Scheduler = require("__computer_core_2__.scripts.guest.scheduler")
 local Collector = require("__computer_core_2__.scripts.guest.collector")
 local Limits = require("__computer_core_2__.scripts.guest.limits")
 local M = {}
+local instruction_machines = math.ceil(Limits.instructions_per_tick / Limits.instructions_per_computer)
+local collection_machines = math.ceil(Limits.collection_work_per_tick / Limits.collection_work_per_computer)
 function M.initial(check)
   local prototype = assert(Compiler.compile('local n=0; while true do n=n+1 end', '=execution-credit-loop'))
   local state = Scheduler.new()
@@ -14,28 +16,28 @@ function M.initial(check)
   end
   local work = Scheduler.tick(state, 200)
   check('explicit tick enforces aggregate execution credits', work == Limits.instructions_per_tick
-    and state.execution_budget.instructions == work and state.cursor == 17)
+    and state.execution_budget.instructions == work and state.cursor == instruction_machines + 1)
   local saved = state.execution_budget
   for _ = 1, 20 do assert(Scheduler.tick(state, 200) == 0) end
   check('same-tick dispatch cannot renew instruction credits', state.execution_budget == saved
-    and saved.instructions == Limits.instructions_per_tick and state.cursor == 17)
+    and saved.instructions == Limits.instructions_per_tick and state.cursor == instruction_machines + 1)
   for _, credits in pairs(saved.machines) do assert(credits.instructions <= Limits.instructions_per_computer) end
   check('looping computers share per-machine instruction ceilings', saved.machines[1].instructions == Limits.instructions_per_computer
-    and saved.machines[16].instructions == Limits.instructions_per_computer and saved.machines[17] == nil)
+    and saved.machines[instruction_machines].instructions == Limits.instructions_per_computer and saved.machines[instruction_machines + 1] == nil)
   storage.execution_credit_scheduler = state
 
   local collecting = Scheduler.new()
-  prototype = assert(Compiler.compile("os.pullEvent('stay')", '=collection-credit-wait'))
+  prototype = assert(Compiler.compile("local keep={}; for i=1,1000 do keep[i]=i end; os.pullEvent('stay'); assert(keep[1000]==1000)", '=collection-credit-wait'))
   for id = 1, 18 do
     local vm = VM.new(prototype)
-    VM.run(vm, 1000)
+    VM.run(vm, 100000)
     assert(vm.wait)
     Collector.start(vm)
     Scheduler.add(collecting, id, vm)
   end
   local _, _, collection_work = Scheduler.tick(collecting, 300)
   check('explicit tick enforces aggregate collection credits', collection_work == Limits.collection_work_per_tick
-    and collecting.execution_budget.collection == collection_work and collecting.cursor == 17)
+    and collecting.execution_budget.collection == collection_work and collecting.cursor == collection_machines + 1)
   local counter = collecting.execution_budget
   for _ = 1, 20 do
     local _, _, repeated = Scheduler.tick(collecting, 300)
@@ -46,7 +48,8 @@ function M.initial(check)
   storage.collection_credit_scheduler = collecting
   local single = Scheduler.new()
   local vm = VM.new(prototype)
-  VM.run(vm, 1000)
+  VM.run(vm, 100000)
+  assert(vm.wait)
   Collector.start(vm)
   Scheduler.add(single, 1, vm)
   local _, _, first = Scheduler.tick(single, 310)
@@ -62,7 +65,7 @@ function M.resume(check)
   check('same-tick reload cannot resume exhausted execution', Scheduler.tick(state, 200) == 0 and state.execution_budget == saved)
   local work = Scheduler.tick(state, 201)
   check('later tick resumes unserved machines fairly', work == Limits.instructions_per_tick
-    and state.execution_budget.tick == 201 and state.execution_budget.machines[17].instructions == Limits.instructions_per_computer)
+    and state.execution_budget.tick == 201 and state.execution_budget.machines[instruction_machines + 1].instructions == Limits.instructions_per_computer)
   local collecting = storage.collection_credit_scheduler
   saved = collecting.execution_budget
   check('collection ceilings survive separate-process reload', saved.tick == 300 and saved.collection == Limits.collection_work_per_tick)
@@ -70,7 +73,7 @@ function M.resume(check)
   check('same-tick reload cannot renew collection work', repeated == 0 and collecting.execution_budget == saved)
   local _, _, renewed = Scheduler.tick(collecting, 301)
   check('later tick resumes deferred collection fairly', renewed > 0 and renewed <= Limits.collection_work_per_tick
-    and collecting.execution_budget.tick == 301 and collecting.execution_budget.machines[17].collection > 0)
+    and collecting.execution_budget.tick == 301 and collecting.execution_budget.machines[collection_machines + 1].collection > 0)
   local single = storage.single_collection_credit_scheduler
   local _, _, extra = Scheduler.tick(single, 310)
   check('per-machine collection exhaustion survives reload without aggregate exhaustion', extra == 0

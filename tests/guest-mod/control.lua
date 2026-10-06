@@ -198,19 +198,20 @@ script.on_init(function()
   local scheduler = Scheduler.new()
   local loop = assert(Compiler.compile("while true do end", "infinite"))
   for id = 1, 64 do Scheduler.add(scheduler, id, VM.new(loop)) end
-  for _ = 1, 8 do
+  local round_ticks = 2 * math.ceil(64 * Limits.instructions_per_computer / Limits.instructions_per_tick)
+  for _ = 1, round_ticks do
     local used, _, work = Scheduler.tick(scheduler)
     assert(used <= Limits.instructions_per_tick and work <= Limits.collection_work_per_tick)
   end
   local maximum = 0
   for _, vm in pairs(scheduler.machines) do
-    assert(vm.instructions == 512, "scheduler starvation or unfair quantum")
+    assert(vm.instructions == 2 * Limits.instructions_per_computer, "scheduler starvation or unfair quantum")
     maximum = math.max(maximum, vm.object_count)
   end
   check("64 infinite loops obey aggregate budget and round-robin fairness", maximum > 0)
   Scheduler.remove(scheduler, 17)
   Scheduler.add(scheduler, 65, VM.new(assert(Compiler.compile("return 'responsive-pass'"))))
-  for _ = 1, 8 do Scheduler.tick(scheduler) end
+  for _ = 1, round_ticks do Scheduler.tick(scheduler) end
   check("responsive machine finishes beside infinite loops", scheduler.machines[65].objects[scheduler.machines[65].main.ref].status == "dead")
   local allocating = VM.new(assert(Compiler.compile([[local keep = {value = 7}
     local alias = keep
@@ -233,7 +234,7 @@ script.on_init(function()
   local result = allocating.objects[allocating.main.ref].result
   check("incremental reclamation preserves closures, aliases and suspended coroutines", result and result[1] == "reclamation-pass" and result[2].ref == result[3].ref and allocating.object_count < allocating.next_id - 1)
   plain(allocating, {})
-  log("CC2 GUEST RESOURCE METRICS machines=64 rounds=8 allocation_ticks=" .. ticks .. " live_objects=" .. allocating.object_count .. " allocated_objects=" .. (allocating.next_id - 1))
+  log("CC2 GUEST RESOURCE METRICS machines=64 rounds=" .. round_ticks .. " allocation_ticks=" .. ticks .. " live_objects=" .. allocating.object_count .. " allocated_objects=" .. (allocating.next_id - 1))
   storage.execution = VM.new(assert(storage.prototypes['diagnostic.lua']))
   storage.pattern_execution = VM.new(assert(Compiler.compile([[local waiting = false
     local result, count = string.gsub('ab', '.', function(letter)

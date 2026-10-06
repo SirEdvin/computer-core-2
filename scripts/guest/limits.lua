@@ -1,9 +1,9 @@
 -- Provisional feasibility limits, calibrated by the engine fixtures before cutover.
 return {
-  instructions_per_computer = 256,
+  instructions_per_computer = 1024,
   instructions_per_tick = 4096,
   collection_work_per_tick = 4096,
-  collection_work_per_computer = 256,
+  collection_work_per_computer = 1024,
   collection_interval = 1024,
   active_computers = 512,
   heap_objects = 16384,

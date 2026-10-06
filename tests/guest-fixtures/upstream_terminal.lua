@@ -52,4 +52,41 @@ parent.setVisible(true)
 assert(surface.getLine(2):sub(2, 9) == "xyzDEFGH" and surface.getLine(3):sub(2, 2) == "N", "revealing a hidden window must redraw its retained contents")
 local paintutils = require("paintutils")
 paintutils.drawFilledBox(12, 2, 14, 3, colors.red)
+-- Count calls through the real nested windows/native terminal, not a GUI mock.
+local observed, blits, palettes = {}, 0, 0
+for name, method in pairs(native_term) do observed[name] = method end
+observed.blit = function(...)
+  blits = blits + 1
+  return native_term.blit(...)
+end
+observed.setPaletteColor = function(...)
+  palettes = palettes + 1
+  return native_term.setPaletteColor(...)
+end
+local outer = window.create(observed, 20, 5, 8, 3, true)
+local inner = window.create(outer, 2, 2, 5, 2, true)
+inner.setTextColor(colors.yellow)
+inner.setCursorBlink(true)
+blits, palettes = 0, 0
+inner.write("Z")
+assert(blits == 1 and palettes == 0, "nested write must redraw one row without restoring every palette entry")
+assert(outer.getLine(2):sub(2, 2) == "Z" and inner.getLine(1) == "Z    ")
+local cx, cy = native_term.getCursorPos()
+assert(cx == 22 and cy == 6 and native_term.getTextColor() == colors.yellow and native_term.getCursorBlink())
+blits, palettes = 0, 0
+inner.clearLine()
+assert(blits == 1 and palettes == 0 and inner.getLine(1) == "     ", "nested clearLine must redraw only the cleared row")
+cx, cy = native_term.getCursorPos()
+assert(cx == 22 and cy == 6 and native_term.getCursorBlink(), "row updates must retain guest cursor/blink")
+inner.setVisible(false)
+blits = 0
+inner.write("H")
+assert(blits == 0, "hidden write must stay buffered")
+inner.setVisible(true)
+assert(outer.getLine(2):sub(3, 3) == "H", "reveal must still redraw all retained contents")
+palettes = 0
+inner.setPaletteColor(colors.yellow, 0xabcdef)
+assert(palettes == 1, "nested palette update must propagate one color, not all sixteen per ancestor")
+local r, g, b = native_term.getPaletteColor(colors.yellow)
+assert(math.abs(r - 0xab/255) < 0.000001 and math.abs(g - 0xcd/255) < 0.000001 and math.abs(b - 0xef/255) < 0.000001)
 return "upstream-terminal-pass"
