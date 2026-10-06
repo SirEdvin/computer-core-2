@@ -50,11 +50,12 @@ local function drain(vm,check,phase,reference)
 end
 function M.initial(check)
   local vm=prepare()
+  local before=vm.cleanup_work or 0
   VM.run(vm,1)
   check('deep exception cleanup is staged rather than bulk released',vm.pending_operation ~= nil
     and vm.pending_operation.kind=='failure_cleanup' and #vm.objects[vm.current].frames>1)
-  check('first unwind slice respects weighted ceiling',(vm.cleanup_work or 0)>0
-    and vm.cleanup_work<=Limits.cleanup_work_per_step)
+  check('first unwind slice respects weighted ceiling',(vm.cleanup_work or 0)-before>0
+    and vm.cleanup_work-before<=Limits.cleanup_work_per_step)
   drain(vm,check,'initial')
   vm=prepare(); VM.run(vm,1)
   Collector.start(vm); Collector.step(vm,7)

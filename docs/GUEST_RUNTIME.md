@@ -483,9 +483,37 @@ bound each one-credit delta, retain reference-valued errors through collection
 and separate-process reload, and verify no load-time execution or zero-credit
 progress. Existing heap-quota, coroutine and handler regressions remain active.
 
-This slices exception cleanup only: normal return/tail-call frame release and
-upvalue-close scans still require weighted admission. It does not account for
-physical allocator bytes or establish measured production latency.
+This exception-unwind review scope does not cover physical allocator bytes or
+measured production latency. Normal frame cleanup is described separately below.
+
+## Weighted normal frame cleanup (task 2.4 incomplete)
+
+Normal return, tail-call, protected-boundary removal and coroutine completion
+reuse the exception release cursor and the same 256 weighted units per paid
+execution credit. Register probes cost four units, frame removal and publication
+one each. This allowance is shared across nested normal delivery and secondary
+failure in the same step, not renewed for each frame or control operation.
+After partial release, a plain `frame_cleanup` pending record retains result
+tuples, tail-call arguments/callee, continuations and any pre-admitted status
+prefix. It blocks bytecode until release/publication completes; coroutine death
+and resumer transfer occur only at completion. Ordinary tuple-copy admission is
+unchanged, including protected prefix reservation before boundary removal.
+
+Upvalue-closing jumps reserve eight units per slot before lookup and possible
+cell detachment/replacement, plus one for publishing the target PC. A plain
+`close_upvalues` record retains its frame index, slot/limit and target PC across
+deferral. The next bytecode instruction cannot run against partially closed
+registers. Captured cells and legacy cells missing capture metadata remain
+excluded from recycling; older frames missing `register_limit` use their
+prototype limit. Existing pool/object/depth ceilings are unchanged.
+
+Focused engine fixtures force wide captured frames through return, tail call and
+scope exit, check every one-credit cleanup delta and zero-credit inactivity,
+then collect/reload partial operations in a separate process. They verify all
+96 captured values and nil-containing results survive subsequent register reuse,
+including compatible missing-metadata graphs. Exception/heap/handler/coroutine
+regressions and actual upstream shell/editor workflows remain active. These are
+logical work-unit bounds, not allocator-byte accounting or production latency.
 
 ## Shared continuation-copy work (task 2.4 incomplete)
 
@@ -513,9 +541,10 @@ a concatenation continuation. Handler
 admission failure therefore returns `false, "error in error handling"` rather
 than exempting receiver shifts or other guest-directed work. Recovery control
 remains subject to size/depth and
-execution credits. This is not yet weighted emergency-memory/cleanup admission.
+execution credits. This is not yet weighted emergency-memory admission.
 Other native result-building loops retain their existing string/table/filesystem
-admission; broader bridge coverage and frame cleanup remain open.
+admission; broader bridge and emergency-memory coverage remain open. Frame
+cleanup has its separate shared per-execution-credit allowance described above.
 
 Focused fixtures verify protected per-computer/aggregate refusal with atomic
 counters, retained prior vararg work, zero-credit recovery through collection and

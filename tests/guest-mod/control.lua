@@ -32,6 +32,7 @@ local continuation_checks = require("continuation_checks")
 local full_heap_checks = require("full_heap_checks")
 local continuation_budget_checks = require("continuation_budget_checks")
 local unwind_checks = require("unwind_checks")
+local frame_cleanup_checks = require("frame_cleanup_checks")
 local loaded = false
 local load_checked = false
 local function check(name, condition)
@@ -71,6 +72,7 @@ script.on_init(function()
   full_heap_checks.initial(check)
   continuation_budget_checks.initial(check)
   unwind_checks.initial(check)
+  frame_cleanup_checks.initial(check)
   terminal_checks(check)
   storage.resize_execution = resize_checks.initial(check)
   for _, fixture in ipairs(fixtures) do
@@ -343,6 +345,7 @@ script.on_event(defines.events.on_tick, function()
     full_heap_checks.resume(check)
     continuation_budget_checks.resume(check)
     unwind_checks.resume(check)
+    frame_cleanup_checks.resume(check)
     for name, proto in pairs(storage.prototypes) do
       plain(proto, {})
       check("prototype survives reload " .. name, proto.version == Compiler.VERSION and #proto.instructions > 0)

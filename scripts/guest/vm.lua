@@ -181,21 +181,28 @@ local function cell(vm, frame, index)
   end
   return vm.objects[id]
 end
-local function release_frame(vm, frame)
-  if not frame or not frame.registers then return end
+local function release_frames(vm, co, state)
   vm.free_cells = vm.free_cells or {}
-  for i = 0, (frame.register_limit or frame.proto.max_stack_size) - 1 do
-    -- Bounded, deterministic pool of already quota-counted internal objects.
-    if #vm.free_cells >= Limits.register_pool then return end
-    local id = frame.registers[i]
-    local data = id and vm.objects[id]
-    -- Missing metadata in older execution graphs is deliberately ineligible.
-    if data and data.captured == false then
-      data.value = nil
-      vm.free_cells[#vm.free_cells + 1] = id
-      frame.registers[i] = nil
+  while #co.frames >= state.target do
+    local frame = co.frames[#co.frames]
+    local limit = frame.registers and (frame.register_limit or frame.proto.max_stack_size) or 0
+    if state.slot < limit and #vm.free_cells < Limits.register_pool then
+      if not spend_cleanup_work(vm, 4) then return false end
+      local id = frame.registers[state.slot]
+      local data = id and vm.objects[id]
+      -- Missing capture metadata in older graphs is deliberately ineligible.
+      if data and data.captured == false then
+        data.value = nil
+        vm.free_cells[#vm.free_cells + 1] = id
+        frame.registers[state.slot] = nil
+      end
+      state.slot = state.slot + 1
+    else
+      if not spend_cleanup_work(vm, 1) then return false end
+      co.frames[#co.frames], state.slot = nil, 0
     end
   end
+  return true
 end
 local function get(vm, frame, index)
   local id = frame.registers[index]
@@ -216,7 +223,7 @@ local function values(vm, frame, start, count)
   for i = 1, count do result[i] = get(vm, frame, start + i - 1) end
   return result
 end
-local deliver, call, finish, concatenate
+local deliver, call, finish, concatenate, cleanup_frames
 local function frame_(vm, closure, args, continuation)
   tuple_size(args.n, "guest argument tuple limit exceeded")
   local function_ = object(vm, closure, "closure")
@@ -238,23 +245,39 @@ local function prefixed(prefix, result, admitted)
   for i = 1, result.n do out[i + 1] = result[i] end
   return out
 end
-finish = function(vm, co, result, err, failed)
-  tuple_size(result.n)
-  -- Validate status-prefix growth while failure still belongs to the child.
-  local returned = co.resumer and (failed and tuple(false, err) or prefixed(true, result))
+local function publish_finish(vm, co, state)
   co.status = "dead"
   co.resume_depth = nil
-  co.result, co.error, co.failed = result, err, failed
-  for i = #co.frames, 1, -1 do release_frame(vm, co.frames[i]) end
-  co.frames = {}
+  co.result, co.error, co.failed = state.result, state.err, state.failed
   if co.resumer then
     local resumer = co.resumer
     co.resumer = nil
     local parent = vm.objects[resumer.id]
     parent.status = "running"
     vm.current = resumer.id
-    deliver(vm, parent, resumer.continuation, returned)
+    deliver(vm, parent, resumer.continuation, state.returned)
   else vm.current = nil end
+end
+cleanup_frames = function(vm, co, state)
+  if release_frames(vm, co, state) and spend_cleanup_work(vm, 1) then
+    if state.kind == "return" then deliver(vm, co, state.continuation, state.result)
+    elseif state.kind == "tailcall" then call(vm, co, state.fn, state.args, state.continuation)
+    else
+      assert(state.kind == "finish", "invalid frame cleanup kind")
+      publish_finish(vm, co, state)
+    end
+    return
+  end
+  assert(vm.current and vm.objects[vm.current] == co, "pending frame cleanup owner mismatch")
+  assert(not vm.pending_operation, "pending frame cleanup operation already exists")
+  vm.pending_operation = {kind = "frame_cleanup", co = {ref = vm.current}, a = state, recovery = recovery_scope}
+end
+finish = function(vm, co, result, err, failed)
+  tuple_size(result.n)
+  -- Validate status-prefix growth while failure still belongs to the child.
+  local returned = co.resumer and (failed and tuple(false, err) or prefixed(true, result))
+  cleanup_frames(vm, co, {kind = "finish", target = 1, slot = 0,
+    result = result, err = err, failed = failed, returned = returned})
 end
 deliver = function(vm, co, continuation, result)
   tuple_size(result.n)
@@ -275,9 +298,8 @@ deliver = function(vm, co, continuation, result)
       spend_continuation_work(2 + result.n)
       next_continuation = {kind = "protected", parent = next_continuation.parent, prefix_admitted = true}
     end
-    local frame = table.remove(co.frames)
-    release_frame(vm, frame)
-    deliver(vm, co, next_continuation, result)
+    cleanup_frames(vm, co, {kind = "return", target = #co.frames, slot = 0,
+      continuation = next_continuation, result = result})
   elseif kind == "protected" then
     deliver(vm, co, continuation.parent, prefixed(true, result, continuation.prefix_admitted))
   elseif kind == "error_handler" then
@@ -864,6 +886,27 @@ local arithmetic = {
   mul = function(a,b) return a*b end, div = function(a,b) return a/b end,
   mod = function(a,b) return a%b end, pow = function(a,b) return a^b end
 }
+local function close_upvalues(vm, co, state)
+  local frame = assert(co.frames[state.frame])
+  while state.slot < state.limit do
+    -- Include lookup, detachment and possible pool/allocation/initialization.
+    if not spend_cleanup_work(vm, 8) then break end
+    local i = state.slot
+    if frame.registers[i] and vm.objects[frame.registers[i]].captured ~= false then
+      local value = get(vm, frame, i)
+      frame.registers[i] = nil
+      cell(vm, frame, i).value = value
+    end
+    state.slot = state.slot + 1
+  end
+  if state.slot == state.limit and spend_cleanup_work(vm, 1) then
+    frame.pc = state.pc
+    return
+  end
+  assert(vm.current and vm.objects[vm.current] == co, "pending upvalue close owner mismatch")
+  assert(not vm.pending_operation, "pending upvalue close operation already exists")
+  vm.pending_operation = {kind = "close_upvalues", co = {ref = vm.current}, a = state, recovery = recovery_scope}
+end
 local function step(vm, co)
   local frame = assert(co.frames[#co.frames], "missing guest frame")
   assert(frame.kind == "frame", "unresolved guest boundary")
@@ -913,15 +956,9 @@ local function step(vm, co)
   elseif op == "concat" then concatenate(vm, co, #co.frames, a, c - 1, b, get(vm, frame, c))
   elseif op == "jmp" then
     if a > 0 then
-      for i = a - 1, proto.max_stack_size - 1 do
-        if frame.registers[i] and vm.objects[frame.registers[i]].captured ~= false then
-          local value = get(vm, frame, i)
-          frame.registers[i] = nil
-          cell(vm, frame, i).value = value
-        end
-      end
-    end
-    frame.pc = frame.pc + inst.sbx
+      close_upvalues(vm, co, {frame = #co.frames, slot = a - 1,
+        limit = proto.max_stack_size, pc = frame.pc + inst.sbx})
+    else frame.pc = frame.pc + inst.sbx end
   elseif op == "eq" or op == "lt" or op == "le" then
     local left, right = rk(vm, frame, b), rk(vm, frame, c)
     local accept = a == true or a == 1
@@ -955,15 +992,13 @@ local function step(vm, co)
     local args = values(vm, frame, a + 1, count)
     local fn = get(vm, frame, a)
     if op == "tailcall" then
-      table.remove(co.frames)
-      release_frame(vm, frame)
-      call(vm, co, fn, args, frame.continuation)
+      cleanup_frames(vm, co, {kind = "tailcall", target = #co.frames, slot = 0,
+        fn = fn, args = args, continuation = frame.continuation})
     else call(vm, co, fn, args, destination(co, a, c == 0 and -1 or c - 1)) end
   elseif op == "return" then
     local result = values(vm, frame, a, b == 0 and frame.top - a or b - 1)
-    table.remove(co.frames)
-    release_frame(vm, frame)
-    deliver(vm, co, frame.continuation, result)
+    cleanup_frames(vm, co, {kind = "return", target = #co.frames, slot = 0,
+      result = result, continuation = frame.continuation})
   elseif op == "forprep" then
     local work = 0
     for i = a, a + 2 do work = work + numeric_string_work(get(vm, frame, i)) end
@@ -1020,28 +1055,8 @@ cleanup_failure = function(vm, co, state)
         else state.scan = state.scan - 1 end
       end
     elseif state.phase == "release" then
-      if #co.frames < state.target then state.phase = "publish"
-      else
-        local frame = co.frames[#co.frames]
-        local limit = frame.registers and (frame.register_limit or frame.proto.max_stack_size) or 0
-        vm.free_cells = vm.free_cells or {}
-        if state.slot < limit and #vm.free_cells < Limits.register_pool then
-          -- Reserve lookup plus possible value clearing/pool append/register
-          -- removal before touching a slot, including captured/absent cells.
-          if not spend_cleanup_work(vm, 4) then break end
-          local id = frame.registers[state.slot]
-          local data = id and vm.objects[id]
-          if data and data.captured == false then
-            data.value = nil
-            vm.free_cells[#vm.free_cells + 1] = id
-            frame.registers[state.slot] = nil
-          end
-          state.slot = state.slot + 1
-        else
-          if not spend_cleanup_work(vm, 1) then break end
-          co.frames[#co.frames], state.slot = nil, 0
-        end
-      end
+      if not release_frames(vm, co, state) then break end
+      state.phase = "publish"
     else
       assert(state.phase == "publish", "invalid cleanup phase")
       if not spend_cleanup_work(vm, 1) then break end
@@ -1087,6 +1102,8 @@ end
 call = controlled("call", call)
 deliver = controlled("deliver", deliver)
 finish = controlled("finish", finish)
+cleanup_frames = controlled("frame_cleanup", cleanup_frames)
+close_upvalues = controlled("close_upvalues", close_upvalues)
 failure = controlled("failure", failure)
 cleanup_failure = controlled("failure_cleanup", cleanup_failure)
 local function pending_step(vm)

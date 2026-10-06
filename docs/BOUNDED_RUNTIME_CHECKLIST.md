@@ -40,6 +40,11 @@ stays active; neither this checklist nor headless success authorizes cutover.
   delivery, frame setup, prefixes and native argument shifts. Protected prefix
   admission precedes boundary removal; mandatory recovery carries plain mode
   metadata and remains executable with exhausted ordinary credits.
+- Weighted normal and exception frame release plus upvalue-close scans: share
+  one allowance per paid execution credit; cursor/result/callee state remains
+  rooted across deferral and collection/reload. Scoped spec/quality reviews of
+  the new normal paths passed; retained/emergency-memory and measured latency
+  remain open.
 
 ## Required remaining implementation groups
 
@@ -53,8 +58,7 @@ stays active; neither this checklist nor headless success authorizes cutover.
 
 2. Compound operation and error-recovery bounds.
    Tuple/prefix and native protected-frame size checks are implemented; bound
-   remaining native copy bridges, weighted frame scans/cleanup and emergency
-   recovery admission,
+   remaining native copy bridges and emergency recovery admission,
    not only bytecode instruction count. Recursive propagation/resumer depth now
    has staged/size bounds, but these do not measure total work inside each phase.
    Secondary guest-object-quota recovery is implemented for tested nested
@@ -219,12 +223,13 @@ retained. Scoped specification and code-quality reviews passed without blocking
 findings. Both were source-only, without an independent engine rerun. The quality
 review also approved the EOF-reap harness fix. Optional follow-up tests directly
 covering EOF while a child remains alive and EOF timeout are not yet implemented.
-Normal return/tail-call cleanup,
-upvalue-close scans, retained/emergency memory and measured latency remain open.
+That review did not cover normal return/tail-call cleanup or upvalue-close scans;
+the subsequent batch is recorded below. Retained/emergency memory and measured
+latency remain open.
 
 ## Consolidated packaged headless baseline
 
-The current source built a 132-file deterministic archive and passed all six
+Checkpoint `98b02c9` built a 132-file deterministic archive and passed all six
 packaged configurations: base/expansion guest, base grow reload, expansion shrink
 reload, and base/expansion existing-workbench regressions. Guest checks were
 338 initial / 457 cumulative reload, or 459 with changed geometry; existing
@@ -252,3 +257,30 @@ unrelated OpenSpec root configuration and generated verification evidence.
 Vendor/patch and generated ROM whitespace is retained byte-for-byte; authored
 code passes the staged whitespace check, and the resource verifier validates
 the preserved upstream and installed hashes. Task 2.4 remains unchecked.
+
+## Reviewed normal frame-cleanup batch
+
+Normal return/tail-call/boundary/finish cleanup now reuses the exception release
+cursor; upvalue-closing jumps use a plain slot/target-PC cursor. Both share the
+existing 256 weighted units per paid execution credit, including nested delivery
+and secondary failure. Normal publication retains result/callee/args/continuation
+data until cleanup completes. No additional guest bytecode runs while pending.
+Captured/legacy-cell exclusions and existing ceilings remain unchanged.
+
+The expected-red bootstrap reproduced synchronous wide return cleanup. After
+the fix, the focused pinned-engine scenario passed 350 initial and 478 cumulative
+separate-process reload checks, with three clean phases, no signals/forced kills
+and all completion markers. New fixtures validate all 96 captured values, nil
+tuples, each one-credit cleanup bound, zero-credit inactivity, partial collection
+and reload, and compatible missing metadata for return, tailcall and scope exit.
+The existing exception/secondary-quota/coroutine/handler regressions and actual
+upstream shell/editor workflows also passed. Seven shutdown tests, resource
+verification and authored diff checks passed. Failed/red and successful evidence
+are retained outside the repo in `cc2-frame-cleanup-*` scratch paths.
+
+Scoped specification review passed without blocking findings (`deleg_626a8e80`),
+based on source and the retained verification artifact, not independent execution.
+Scoped code-quality review approved the same batch without blocking findings
+(`deleg_2df67b91`), also source/evidence-only, without an independent engine run.
+This is focused source-checkout evidence, not a new packaged matrix, full task
+2.4 approval, retained/emergency-memory accounting, measured latency or clients.
