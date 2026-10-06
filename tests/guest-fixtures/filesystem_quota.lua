@@ -1,0 +1,11 @@
+local handle = assert(io.open("/old.txt", "w"))
+local ok, err = pcall(handle.write, handle, "new!")
+assert(not ok and type(err) == "string")
+assert(not pcall(handle.close, handle))
+local previous = assert(io.open("/old.txt", "r"))
+assert(previous:read("a") == "old")
+previous:close()
+assert(not pcall(fs.copy, "/old.txt", "/duplicate.txt"))
+assert(not fs.exists("/duplicate.txt"))
+assert(fs.getFreeSpace("/") == 0)
+return "filesystem-quota-pass"

@@ -1,0 +1,9 @@
+--- src/indexed_linked_list.lua
++++ vendor/phobos/indexed_linked_list.lua
+@@ -1,5 +1,5 @@
+ 
+-local util = require("util")
++local util = require("__computer_core_2__.vendor.phobos.util")
+ 
+ ---every `index_spacing`-th index will be used when prepending, appending or re-indexing\
+ ---leaving a gap of `index_spacing - 1`\

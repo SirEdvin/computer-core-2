@@ -1,0 +1,75 @@
+--- src/tokenize.lua
++++ vendor/phobos/tokenize.lua
+@@ -1,6 +1,6 @@
+ 
+-local error_code_util = require("error_code_util")
+-local util = require("util")
++local error_code_util = require("__computer_core_2__.vendor.phobos.error_code_util")
++local util = require("__computer_core_2__.vendor.phobos.util")
+ local keywords = util.invert{
+   "and", "break", "do", "else", "elseif", "end", "false",
+   "for", "function", "if", "in", "local", "nil", "not",
+@@ -84,9 +84,11 @@
+   local parts = {}
+ 
+   ::matching::
++  util.spend_work()
+   local start_i = i
+   -- read through normal text...
+   while str:match("^[^"..quote.."\\\r\n]",i) do
++    util.spend_work()
+     i = i + 1
+   end
+ 
+@@ -162,6 +164,7 @@
+       i = skip + 1
+       -- figure out the right line and line_offset
+       while true do
++        util.spend_work()
+         local newline_index, newline_char = str:match("^[^%S\r\n]*()([\r\n])", j)
+         if not newline_index then
+           break
+@@ -248,9 +251,12 @@
+   local parts = {""}
+   local close_pattern = "^%]"..pad.."%]()"
+   while true do
++    util.spend_work()
+     local part, stopped_at, stop_char = str:match("^([^\r\n%]]*)()(.?)", next_index)
+     parts[#parts+1] = part
+     if stop_char == "]" then
++      -- Pre-charge the variable-sized comparison, not just the loop iteration.
++      util.spend_work(#pad + 2)
+       local bracket_end = str:match(close_pattern, stopped_at)
+       if bracket_end then
+         local token = new_token("string", index, token_line, token_col)
+@@ -298,6 +304,7 @@
+   end
+   local pattern = "^[%x.]*"..exponent.."[+-]?()"
+   while true do
++    util.spend_work()
+     local next_index = str:match(pattern, index)
+     if not next_index then break end
+     index = next_index
+@@ -374,7 +381,7 @@
+ ---@param index integer
+ ---@return integer?
+ ---@return Token?
+-local function next_token(state,index)
++local function read_token(state,index)
+   if not index then index = 1 end
+   local str = state.str
+   local next_char = str:sub(index,index)
+@@ -475,6 +482,13 @@
+   end
+ end
+ 
++local function next_token(state, index)
++  util.spend_work()
++  local next_index, token = read_token(state, index)
++  if next_index then util.spend_work(next_index - (index or 1)) end
++  return next_index, token
++end
++
+ ---@class TokenizeState
+ ---@field str string
+ ---@field source string
