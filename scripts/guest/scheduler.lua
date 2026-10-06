@@ -1,4 +1,4 @@
--- Isolated guest scheduler; the live callback workbench does not use this yet.
+-- Durable guest scheduler shared by live computers and isolated tests.
 local VM = require("__computer_core_2__.scripts.guest.vm")
 local Limits = require("__computer_core_2__.scripts.guest.limits")
 local Collector = require("__computer_core_2__.scripts.guest.collector")

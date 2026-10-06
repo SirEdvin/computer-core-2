@@ -271,7 +271,7 @@ function term.read(replace, history, complete, default)
         buffer = id .. buffer
       else
         buffer = buffer:sub(0, -cursor_pos - 1)..id..
-          buffer:sub(-cursor_pos+(#id-1))
+          buffer:sub(-cursor_pos)
       end
 
     elseif evt == "key" then

@@ -1,98 +1,65 @@
-# Computer Core 2 (ALPHA)
+# Computer Core 2 — experimental 0.2.0 alpha
 
-**Experimental alpha 0.1.2 — not a stable release.** Back up your saves and use a
-fresh test world. Expect bugs and possible API/save-format changes before stability.
-No migration from legacy Computer Core saves or persisted closures is provided.
+A terminal-only Lua computer for Factorio 2.0.77+, using a pinned Recrafted BIOS,
+shell and editors inside a durable guest VM. Existing world artwork is retained.
+This is an explicitly experimental playtest, not stable or full CraftOS compatibility.
 
-The packaged mod passes real Factorio 2.0.77 base and expansion headless tests,
-including save/reload. This does **not** establish client acceptance: GUI layout and
-input, audible speakers, personal-computer surface deletion, robot-built externally
-wired blueprints, and multiplayer client joining remain unverified. Follow
-[the client checklist](docs/CLIENT_CHECKLIST.md) and report reproduction steps,
-Factorio version, enabled mods and relevant logs when encountering bugs.
+**Back up saves. Prefer a fresh world or a separate upgraded-save copy. Never
+load a migrated save with an older mod version. Client UI and multiplayer tests
+are still unverified and belong to the playtester.**
 
-Only execute Lua programs you trust: the sandbox's data limits do not prevent an
-infinite loop from stalling the simulation. Persistent callbacks use named handlers
-and explicit serializable state, not the original mod's persisted closures.
+## Install and use
 
-Programmable Lua computers for Factorio 2.0: a terminal, filesystem, circuit ports,
-wireless messaging, programmable speaker, personal gauntlet and waypoint manager.
-A source-based modernization of [Computer Core](https://github.com/Relik77/factorio_computer_core),
-retaining its artwork and MIT license. Upstream reference:
-`92e4ab616d385dfb0247ce2fc195c0e189b01efd`.
+1. Copy the supplied `computer_core_2_0.2.0.zip` into Factorio's `mods` directory.
+   Do not enable the original `computer_core` simultaneously.
+2. Research Personal Computer, then Computer. Supply power to a placed computer.
+3. Stay within ten tiles and Ctrl+left-click its body, or Ctrl+G for the private
+   personal gauntlet (requires research and a character).
+4. Click the capture field below the grid. Text/paste sends immediately; Enter
+   submits. Navigation buttons provide a fallback for intercepted shortcuts.
+5. Type `edit /hello.lua`. Enter `print("Hello")`; Ctrl+M or **Ctrl / menu** opens
+   the editor menu, then type **s** to save or **e** to exit. Run `/hello.lua`.
 
-## Install and play
+Close preserves the running OS. Reboot discards unsaved guest buffers, not saved
+files. Shutdown stops dispatch until reboot. Power loss pauses execution; overdue
+timers become due after power returns. Physical viewers share one input stream.
 
-Requires Factorio **2.0.77 or newer**. Automated verification is pinned to 2.0.77,
-with both base-only and Quality / Elevated Rails / Space Age configurations.
-Use a fresh 2.0 world; old Computer Core saves are not supported. The two mods
-cannot be enabled together.
+Read [playtest steps/checklist](docs/PLAYTEST.md) and [known limitations](docs/KNOWN_LIMITATIONS.md).
+Printable ASCII is the initial render surface; other bytes show fallback glyphs
+without altering file bytes. Synthetic releases, no drag, fixed background palette
+and gradual large-grid redraw are documented alpha limitations. Boot/editor
+responsiveness is provisional, not a measured latency guarantee.
 
-1. Build the archive with `python3 tools/package.py`.
-2. Copy `dist/computer_core_2_0.1.2.zip` to your Factorio `mods` directory.
-3. Research Personal Computer and Computer. Craft a computer and connect power.
-4. Select a computer and press **Ctrl + left mouse button** to open its terminal.
-   Stay within 10 tiles. Use **Ctrl + G** or the gauntlet shortcut for your personal computer.
-5. Use **Files → New file** to open the editor, or enter `help`, `help apis` or `help os`
-   in the Terminal. Create a script with `edit /counter.lua`,
-   paste [examples/counter.lua](examples/counter.lua), then choose Save & run.
+## Breaking upgrade
 
-The gauntlet requires a character and research; it has no physical circuit ports
-or speaker. Computer labels expose same-force/same-surface files under
-`/mnt/<label>`. Programs pause without power; overdue timers fire after power returns.
-The workbench stays open while unpowered so files/drafts remain inspectable; starting
-programs and sending input require power. Program input is sent with Send/Enter,
-not on each keystroke. The window adapts to resolution/UI-scale changes.
+0.1.x workbench, callback APIs, native editor and world/network programming APIs
+are retired. Stored files and recoverable drafts are preserved, but programs are
+not converted. Legacy startup files remain inert under `/legacy-startup*`; `/rc`
+collisions and drafts recover under `/legacy-recovery`. Original data remains
+archived if quota limits prevent a recovery copy. Do not downgrade migrated saves.
 
-See [workbench design and verification](docs/WORKBENCH.md) for the UI changes,
-wire-anchor fix, native-client acceptance limits and reference mods.
+Older API/workbench documents and callback examples describe 0.1.x only; they are
+historical, not instructions for this OS. Current guest contracts are documented in
+[terminal services](docs/TERMINAL_SERVICES.md), [guest filesystem](docs/GUEST_FILESYSTEM.md)
+and [guest runtime](docs/GUEST_RUNTIME.md). Guides/examples remain repository-only.
 
-## Durable programs, not serialized closures
+## Build and verify
 
-```lua
-return {
-  init = function()
-    state.count = state.count or 0
-    os.wait("step", 1)
-  end,
-  step = function()
-    state.count = state.count + 1
-    term.write(state.count)
-    os.wait("step", 1)
-  end
-}
-```
+Python tools use the standard library; install official Factorio 2.0.77 headless
+separately. No engine executable is redistributed.
 
-Keep lasting values in `state` or `os.set`. Callbacks use **handler names**, not
-function values. `init` runs once at program start, not at load. Program declarations
-are reconstructed before every dispatch; captured locals do not carry between
-callbacks. Keep module scope free of side effects and state mutations. Pure libraries
-loaded with `os.require` are snapshotted with the running program.
+    python3 tools/verify_guest_resources.py
+    python3 tools/package.py
+    python3 tests/run_engine.py --guest
+    python3 tests/run_engine.py --guest --expansion
 
-Guides and Lua examples are **repository-only**, excluded from the mod ZIP.
-Start with [practical use cases](docs/USE_CASES.md).
-See [API reference](docs/API.md), [migration contract](docs/MIGRATION.md),
-[client verification checklist](docs/CLIENT_CHECKLIST.md) and [examples](examples/).
+Use `--archive <zip>` to test the package and `--output <directory>` to retain
+isolated logs, saves and `result.json`. Guest checks exercise actual ROM programs,
+separate-process reload and selected live lifecycle/migration fixtures, not native
+GUI interaction or complete upgraded-save/client acceptance. The historical
+non-guest test mode targets the retired 0.1.x API and is not alpha acceptance.
 
-## Development and verification
-
-Install the official Factorio 2.0.77 Linux headless distribution separately. No engine
-binary is redistributed by this project. Python scripts need only the standard library.
-
-```sh
-python3 tests/run_engine.py --factorio /path/to/factorio/bin/x64/factorio
-python3 tests/run_engine.py --factorio /path/to/factorio/bin/x64/factorio --expansion
-python3 tools/package.py
-```
-
-Tests create isolated mod/config/save directories, run the actual engine, save at tick
-30 and resume that save. Logs and a machine-readable `result.json` remain in the printed
-output directory. `--output <directory>` chooses its location. GUI tests require a
-client-created player and are explicitly skipped in playerless headless worlds.
-Table-backed GUI interaction contracts and pure resolution/UI-scale layout rules
-are tested headlessly; these are not native rendering or real mouse/keyboard tests.
-Client appearance, controls, audible playback and multiplayer joining need the checklist;
-headless success is not proof of those checks.
-
-Code layout: `data.lua` (modern prototypes), `control.lua` (events/remote interface),
-`scripts/` (runtime, filesystem, adapters, lifecycle, shell, GUI), `tests/` (engine harness).
+Source-only Phobos/Recrafted resources are pinned and attributed in
+[vendor/README.md](vendor/README.md) and `vendor/manifest.json`. Original Computer
+Core artwork/code provenance is retained under the repository MIT license;
+reference revision `92e4ab616d385dfb0247ce2fc195c0e189b01efd`.

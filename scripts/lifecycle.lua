@@ -1,6 +1,6 @@
 local U = require("scripts.util")
 local FS = require("scripts.filesystem")
-local R = require("scripts.runtime")
+local R = require("scripts.os_runtime")
 local A = require("scripts.adapters")
 local M = {}
 local specs = {
@@ -11,7 +11,7 @@ local specs = {
   speaker_combinator = {name = "computer-speaker-combinator", x = 0, y = 0}
 }
 function M.init()
-  storage.schema = 1
+  storage.schema = storage.schema or 1
   storage.computers = storage.computers or {}
   storage.units = storage.units or {}
   storage.children = storage.children or {}
@@ -164,7 +164,7 @@ function M.clone(source, destination)
     local original = source and source.valid and storage.computers[storage.units[source.unit_number]]
     local c = M.build(destination)
     if original then
-      c.fs, c.state, c.vars = U.data(original.fs, {nodes = 65536, bytes = 4194304, depth = 32}), U.data(original.state), U.data(original.vars)
+      c.fs, c.state, c.vars = U.data(R.files(original), {nodes = 65536, bytes = 4194304, depth = 32}), U.data(original.state), U.data(original.vars)
       c.extension_state = U.data(original.extension_state)
       -- Deliberately do not copy identity, label, running process or pending effects.
     end
@@ -211,6 +211,6 @@ function M.tick()
   end
 end
 function M.snapshot(c)
-  return {computer_core_2 = {fs = U.data(c.fs, {nodes = 65536, bytes = 4194304, depth = 32})}}
+  return {computer_core_2 = {fs = U.data(R.files(c), {nodes = 65536, bytes = 4194304, depth = 32})}}
 end
 return M

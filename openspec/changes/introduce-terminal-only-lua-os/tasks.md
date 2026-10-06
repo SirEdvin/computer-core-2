@@ -1,5 +1,10 @@
 # Tasks
 
+Playtest override: deliver an experimental alpha now, with client UI validation
+owned by the user and remaining resource-envelope/edge cases documented. Client
+acceptance tasks remain unchecked until verified. The user explicitly permits
+section 5 integration for this playtest without claiming section 4 passed.
+
 ## 1. Pinned dependencies and diagnostic harness
 
 - [x] 1.1 Vendor the pinned Phobos and terminal-only Recrafted dependency closure with a source/hash/license manifest and minimal integration patch ledger; verify every included file is attributed and no excluded peripheral/network startup or completion program is included.
@@ -30,7 +35,7 @@
 - [ ] 4.4 Exercise two real clients typing into one computer, focus loss/disconnect, save/reload and another client joining; verify synchronized shared display, input ordering and isolated per-viewer pressed state without exclusive input ownership.
 - [ ] 4.5 Record the complete feasibility verdict across guest execution, upstream editor/shell, host-operation bounds, actual input/rendering, reload and joining; verify every gate has real evidence before authorizing section 5, and stop for user review if any gate fails.
 
-## 5. Terminal cutover and safe migration — only after section 4 passes
+## 5. Terminal cutover and safe migration — experimental playtest override applies
 
 - [ ] 5.1 Replace workbench views in `scripts/gui.lua`, layout/styles and control event wiring with the terminal-only view; verify there is no native editor/file-browser/custom-shell panel and all authorized viewers may input while existing per-event research/force/surface/distance and personal-owner checks remain effective.
 - [ ] 5.2 Replace named-handler dispatch in runtime/lifecycle integration with the guest scheduler, retaining existing physical power/ownership constraints; verify opening/closing viewers does not reboot execution and remove obsolete callback extension dispatch without adding world API bridges.
@@ -44,5 +49,5 @@
 
 ## 7. Packaged integration acceptance
 
-- [ ] 7.1 Update `tools/package.py` to include pinned ROM/compiler resources, glyph/art resources, notices and manifests; verify the built ZIP contains only allowlisted resources and passes engine creation and separate-process reload in base and supported expansion configurations.
+- [x] 7.1 Update `tools/package.py` to include pinned ROM/compiler resources, glyph/art resources, notices and manifests; verify the built ZIP contains only allowlisted resources and passes engine creation and separate-process reload in base and supported expansion configurations.
 - [ ] 7.2 Run the final packaged-mod client/multiplayer workflow and upgraded-save acceptance checklist; verify shell boot, editor save/reopen/run, colors/windows, shared all-viewer input, authorization, power/viewer lifecycle, save/reload and join behavior with no untested acceptance claim.

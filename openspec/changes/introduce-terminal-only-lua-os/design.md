@@ -14,6 +14,18 @@ Research tested Factorio 2.0.77 in isolated engine processes. Phobos compiled al
 
 ## Decisions
 
+### Experimental playtest delivery override
+
+The user explicitly authorized an experimental playable build before the full
+feasibility gate, with all graphical/client UI testing handed to the user.
+Deliver terminal/runtime integration and a new alpha package now; document
+remaining edge cases and provisional resource/performance limits rather than
+extending interpreter hardening indefinitely. Existing authorization, disk
+preservation, source sandbox and enforced quotas remain mandatory. Client,
+multiplayer and full resource-envelope acceptance remain unverified, not waived
+as completed. Section 5 may proceed for this explicitly labelled playtest build;
+the original complete acceptance gate still applies to a validated release.
+
 ### 1. Data-backed guest VM with Phobos compilation
 
 Pin Phobos at `2566dd85807b4f2bdff8e40ba4d79bcf8e96de3f`. Normalize compiler output into versioned instruction/constants/prototype records. Implement Lua 5.2 guest execution with explicit frames, closures/upvalues, guest tables/metatables, protected calls, and virtual coroutine state. Durable references use stable guest IDs; host services use symbolic bridge IDs resolved outside storage. Never save host closures, native coroutine objects, GUI objects, or raw compiler descriptors.

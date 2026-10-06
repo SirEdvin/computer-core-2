@@ -1,8 +1,10 @@
 # Bounded-runtime milestone checklist
 
 This checklist consolidates task 2.4 rather than treating each helper as a new
-milestone. OpenSpec acceptance remains authoritative. The existing workbench
-stays active; neither this checklist nor headless success authorizes cutover.
+milestone. OpenSpec acceptance remains authoritative. The user subsequently
+authorized the experimental 0.2.0 playtest cutover; this checklist and headless
+success do not establish the full validated-release gate. See PLAYTEST.md and
+KNOWN_LIMITATIONS.md for the alpha exception and remaining client-owned checks.
 
 ## Implemented; retain regression coverage
 

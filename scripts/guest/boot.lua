@@ -1,4 +1,4 @@
--- Isolated ROM boot factory. No live workbench/callback cutover.
+-- Pinned ROM boot factory shared by live computers and isolated tests.
 local Compiler = require("__computer_core_2__.scripts.guest.compiler")
 local VM = require("__computer_core_2__.scripts.guest.vm")
 local Rom = require("__computer_core_2__.scripts.guest.rom")

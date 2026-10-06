@@ -45,8 +45,8 @@ The guest SHALL access only approved terminal/local-file services and safe langu
 - **THEN** it cannot obtain host functions or Factorio objects and receives an ordinary guest error for unsupported access
 
 ### Requirement: Blocking feasibility acceptance
-The existing UI SHALL remain available until actual upstream shell/editor execution, bounded execution, separate-process save/reload, real client input/rendering and multiplayer joining have passed recorded acceptance checks.
+The existing UI SHALL remain available until actual upstream shell/editor execution, bounded execution, separate-process save/reload, real client input/rendering and multiplayer joining have passed recorded acceptance checks, except for an explicitly user-authorized experimental playtest cutover. Such a build SHALL be labelled unverified alpha, preserve mandatory authorization/data protection/sandboxing, document unfinished gates, and hand client testing to the user without claiming it passed.
 
 #### Scenario: Compiler success is insufficient
 - **WHEN** ROM sources compile but interactive execution or input capture has not passed acceptance
-- **THEN** the workbench is not replaced and feasibility is reported as incomplete
+- **THEN** feasibility is reported as incomplete and the workbench is not replaced unless the user explicitly authorizes an experimental playtest cutover

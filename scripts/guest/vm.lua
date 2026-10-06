@@ -637,6 +637,9 @@ native["os.cancelTimer"] = function(vm, _, args)
   return tuple()
 end
 native["os.clock"] = function(vm) spend_event_work(1); return tuple(vm.events.tick / 60) end
+native["os.getComputerID"] = function(vm) return tuple(vm.computer_id or 0) end
+native["os.shutdown"] = function(vm) vm.host_request = "shutdown"; return tuple() end
+native["os.reboot"] = function(vm) vm.host_request = "reboot"; return tuple() end
 native["os.sleep"] = function(vm, co, args, cont)
   -- Reserve timer creation and the initial poll together, before retaining a timer.
   spend_event_work(1 + Events.poll_work(vm.events, "timer"))
@@ -1214,7 +1217,7 @@ local function run(vm, budget)
   assert(type(budget) == "number" and budget >= 0 and budget <= 100000 and budget == math.floor(budget), "invalid guest instruction budget")
   M.reconcile_configured(vm)
   local used = 0
-  if vm.wait and budget > 0 then
+  if vm.wait and budget > 0 and not vm.host_request then
     local waiting = vm.wait
     local admitted, event, err = pcall(Events.poll, vm.events, waiting.filter, waiting.raw, waiting.timer, spend_event_work)
     if not admitted then err, event = event, nil end
@@ -1235,7 +1238,7 @@ local function run(vm, budget)
       end
     end
   end
-  while vm.current and used < budget do
+  while vm.current and used < budget and not vm.host_request do
     local co = vm.objects[vm.current]
     -- Deferred native propagation consumes the same durable execution credits
     -- as a bytecode step and always precedes access to a possibly empty frame.

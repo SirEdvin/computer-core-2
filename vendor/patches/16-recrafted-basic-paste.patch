@@ -1,0 +1,27 @@
+--- data/computercraft/lua/rom/editors/basic.lua
++++ vendor/recrafted/rom/editors/basic.lua
+@@ -133,6 +133,24 @@
+     state.cx = state.cx + 1
+ 
+     state.lines[state.cy] = line
++
++  elseif event == "paste" then
++    id = id:gsub("\r\n", "\n"):gsub("\r", "\n")
++    state.unsaved = true
++    local start = 1
++    while true do
++      local newline = id:find("\n", start, true)
++      local text = newline and id:sub(start, newline - 1) or id:sub(start)
++      local line = state.lines[state.cy]
++      line = line:sub(1, state.cx - 1) .. text .. line:sub(state.cx)
++      state.cx = state.cx + #text
++      state.lines[state.cy] = line
++      if not newline then break end
++      state.lines[state.cy] = line:sub(1, state.cx - 1)
++      table.insert(state.lines, state.cy + 1, line:sub(state.cx))
++      state.cy, state.cx, start = state.cy + 1, 1, newline + 1
++    end
++    state.scroll = math.max(0, math.min(#state.lines - h + 1, state.cy - h + scroll_offset))
+ 
+   elseif event == "key" then
+     id = keys.getName(id)

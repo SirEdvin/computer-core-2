@@ -6,6 +6,12 @@ Computer Core 2 currently owns a Factorio workbench, shell, and source editor in
 
 ## What Changes
 
+Playtest delivery: the user authorized an experimental alpha terminal cutover
+before full feasibility acceptance and will perform all client UI testing.
+Unverified client/multiplayer and resource-envelope cases are documented openly;
+this does not represent a stable or fully accepted release. Preserve files,
+authorization, sandboxing and existing enforced limits throughout the cutover.
+
 - Introduce a color character terminal with **startup-configurable columns and rows, defaulting to 51×19**, and CC-style cursor, blitting, scrolling, palette, and terminal-redirection behavior. Dimensions are shared by all viewers and remain fixed during play; presentation scaling does not change them.
 - Provide the terminal-related guest environment: keyboard/mouse input, ordered events, virtual coroutines, timers, safe module loading, and the local filesystem/file handles required by the OS and editor. Reuse upstream terminal helpers rather than rewriting them.
 - Bundle a pinned, terminal-only subset of **Recrafted** for its shell, editors, scheduler, and supporting libraries. Its `rc`/`require` conventions are retained; compatibility is specifically terminal-facing, not a claim to implement all CraftOS APIs.

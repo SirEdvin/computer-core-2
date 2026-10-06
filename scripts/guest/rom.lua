@@ -2159,6 +2159,25 @@ local function processInput()
     lines[cy] = line
     changed = true
 
+  elseif event == "paste" then
+    id = id:gsub("\r\n", "\n"):gsub("\r", "\n")
+    unsaved, changed = true, true
+    local start = 1
+    while true do
+      local newline = id:find("\n", start, true)
+      local text = newline and id:sub(start, newline - 1) or id:sub(start)
+      local line = lines[cy]
+      line = line:sub(1, cx - 1) .. text .. line:sub(cx)
+      cx = cx + #text
+      lines[cy] = line
+      if not newline then break end
+      lines[cy] = line:sub(1, cx - 1)
+      table.insert(lines, cy + 1, line:sub(cx))
+      cy, cx, start = cy + 1, 1, newline + 1
+    end
+    scroll = math.max(0, math.min(#lines - h + 1, cy - h + scroll_offset))
+    hscroll = math.max(0, cx - w)
+
   elseif event == "key" then
     id = keys.getName(id)
 
@@ -2435,6 +2454,24 @@ local function processInput()
     state.cx = state.cx + 1
 
     state.lines[state.cy] = line
+
+  elseif event == "paste" then
+    id = id:gsub("\r\n", "\n"):gsub("\r", "\n")
+    state.unsaved = true
+    local start = 1
+    while true do
+      local newline = id:find("\n", start, true)
+      local text = newline and id:sub(start, newline - 1) or id:sub(start)
+      local line = state.lines[state.cy]
+      line = line:sub(1, state.cx - 1) .. text .. line:sub(state.cx)
+      state.cx = state.cx + #text
+      state.lines[state.cy] = line
+      if not newline then break end
+      state.lines[state.cy] = line:sub(1, state.cx - 1)
+      table.insert(state.lines, state.cy + 1, line:sub(state.cx))
+      state.cy, state.cx, start = state.cy + 1, 1, newline + 1
+    end
+    state.scroll = math.max(0, math.min(#state.lines - h + 1, state.cy - h + scroll_offset))
 
   elseif event == "key" then
     id = keys.getName(id)
@@ -5544,7 +5581,7 @@ function term.read(replace, history, complete, default)
         buffer = id .. buffer
       else
         buffer = buffer:sub(0, -cursor_pos - 1)..id..
-          buffer:sub(-cursor_pos+(#id-1))
+          buffer:sub(-cursor_pos)
       end
 
     elseif evt == "key" then

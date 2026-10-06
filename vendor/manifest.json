@@ -537,11 +537,12 @@
       "revision": "720773ec68239504cb134cd4f9b7e8bb66a1408e",
       "source_url": "https://github.com/Ocawesome101/recrafted/blob/720773ec68239504cb134cd4f9b7e8bb66a1408e/data/computercraft/lua/rom/editors/advanced.lua",
       "source_sha256": "8ded400e453451e0653b23afc59cec96cb1de3d2e9d3f3f7f058d54b1fa12782",
-      "sha256": "8ded400e453451e0653b23afc59cec96cb1de3d2e9d3f3f7f058d54b1fa12782",
+      "sha256": "76a492e31d829b5dfc8588cc6bd0a0ce23e8e7eb1a4960df34b8372f329c376e",
       "license": "MIT",
       "copyright": "Copyright (c) 2022 Ocawesome101",
       "license_path": "vendor/recrafted/LICENSE",
-      "guest_path": "/rc/editors/advanced.lua"
+      "guest_path": "/rc/editors/advanced.lua",
+      "patch": "vendor/patches/15-recrafted-advanced-paste.patch"
     },
     {
       "path": "vendor/recrafted/rom/editors/basic.lua",
@@ -550,11 +551,12 @@
       "revision": "720773ec68239504cb134cd4f9b7e8bb66a1408e",
       "source_url": "https://github.com/Ocawesome101/recrafted/blob/720773ec68239504cb134cd4f9b7e8bb66a1408e/data/computercraft/lua/rom/editors/basic.lua",
       "source_sha256": "44e477c765457cb9526d7813c74bc12e8faeb2ab0a2560612639eb98a081cbf8",
-      "sha256": "44e477c765457cb9526d7813c74bc12e8faeb2ab0a2560612639eb98a081cbf8",
+      "sha256": "dc08b1a47a34f71c732e87532b4fe9fd74766b337831c35b8b6a265bff961c3c",
       "license": "MIT",
       "copyright": "Copyright (c) 2022 Ocawesome101",
       "license_path": "vendor/recrafted/LICENSE",
-      "guest_path": "/rc/editors/basic.lua"
+      "guest_path": "/rc/editors/basic.lua",
+      "patch": "vendor/patches/16-recrafted-basic-paste.patch"
     },
     {
       "path": "vendor/recrafted/rom/help/about.hlp",
@@ -994,11 +996,12 @@
       "revision": "720773ec68239504cb134cd4f9b7e8bb66a1408e",
       "source_url": "https://github.com/Ocawesome101/recrafted/blob/720773ec68239504cb134cd4f9b7e8bb66a1408e/data/computercraft/lua/rom/startup/15_term.lua",
       "source_sha256": "836078c089f8f6fd7a8545b10d617f741d70e417ecca685413e51c071dedb87c",
-      "sha256": "836078c089f8f6fd7a8545b10d617f741d70e417ecca685413e51c071dedb87c",
+      "sha256": "6eaaf6dba36050cd925f627cc1b0d25e7496837ba8cc4971fcedf8f340d36b46",
       "license": "MIT",
       "copyright": "Copyright (c) 2022 Ocawesome101",
       "license_path": "vendor/recrafted/LICENSE",
-      "guest_path": "/rc/startup/15_term.lua"
+      "guest_path": "/rc/startup/15_term.lua",
+      "patch": "vendor/patches/17-recrafted-term-paste.patch"
     },
     {
       "path": "vendor/recrafted/rom/startup/20_io.lua",
@@ -1083,7 +1086,6 @@
       "target": "vendor/recrafted/rom/modules/main/rc/thread.lua",
       "reason": "Resolve and restore terminal redirects consistently in boot/current-thread tabs; resize tab windows before delivering term_resize to their programs"
     },
-
     {
       "path": "vendor/patches/13-recrafted-textutils-scalars.patch",
       "target": "vendor/recrafted/rom/apis/textutils.lua",
@@ -1093,6 +1095,21 @@
       "path": "vendor/patches/14-phobos-util-work.patch",
       "target": "vendor/phobos/util.lua",
       "reason": "Scope ephemeral compiler work callbacks and recursive generation counters with protected restoration and exact return arity; keep host callbacks and temporary counters out of stored prototypes"
+    },
+    {
+      "path": "vendor/patches/15-recrafted-advanced-paste.patch",
+      "target": "vendor/recrafted/rom/editors/advanced.lua",
+      "reason": "Insert multiline paste through guest editor state, preserving suffix/cursor and dirty highlighting"
+    },
+    {
+      "path": "vendor/patches/16-recrafted-basic-paste.patch",
+      "target": "vendor/recrafted/rom/editors/basic.lua",
+      "reason": "Insert multiline paste through guest editor state, preserving suffix/cursor and dirty state"
+    },
+    {
+      "path": "vendor/patches/17-recrafted-term-paste.patch",
+      "target": "vendor/recrafted/rom/startup/15_term.lua",
+      "reason": "Preserve complete existing line suffix during paste insertion"
     }
   ],
   "excluded": [
