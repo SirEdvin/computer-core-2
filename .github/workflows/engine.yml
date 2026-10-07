@@ -30,4 +30,4 @@ jobs:
           options=()
           if [ "$MODE" = expansion ]; then options+=(--expansion); fi
           archive="dist/$(jq -r ' .name + "_" + .version + ".zip" ' info.json)"
-          python3 tests/run_engine.py --archive "$archive" "${options[@]}"
+          python3 tests/run_engine.py --guest --archive "$archive" "${options[@]}"

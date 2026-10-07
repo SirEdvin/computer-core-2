@@ -1,0 +1,37 @@
+--- data/computercraft/lua/rom/apis/window.lua
++++ vendor/recrafted/rom/apis/window.lua
+@@ -104,7 +104,12 @@
+     cursorX = max(-100, min(cursorX + #text, width + 1))
+ 
+     local firstVisible, _, maxHeight = math.max(1, -y+2), parent.getSize()
+-    if visible and cursorY >= firstVisible and cursorY <= firstVisible+maxHeight then win.redraw() end
++    if visible and cursorY >= firstVisible and cursorY <= firstVisible+maxHeight then
++      drawLine(cursorY)
++      restoreCursorColor()
++      restoreCursorPos()
++      restoreCursorBlink()
++    end
+   end
+ 
+   function win.blit(text, tcol, bcol)
+@@ -155,7 +160,10 @@
+ 
+     local firstVisible, _, maxHeight = math.max(1, -y+2), parent.getSize()
+     if visible and cursorY >= firstVisible and cursorY <= firstVisible+maxHeight then
+-      win.redraw()
++      drawLine(cursorY)
++      restoreCursorColor()
++      restoreCursorPos()
++      restoreCursorBlink()
+     end
+   end
+ 
+@@ -213,7 +221,7 @@
+     end
+ 
+     if visible then
+-      restorePalette()
++      parent.setPaletteColor(color, palette[math.floor(math.log(color, 2))])
+     end
+   end
+ 

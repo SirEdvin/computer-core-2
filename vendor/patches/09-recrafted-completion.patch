@@ -1,0 +1,18 @@
+--- data/computercraft/lua/rom/modules/main/cc/completion.lua
++++ vendor/recrafted/rom/modules/main/cc/completion.lua
+@@ -2,7 +2,6 @@
+ 
+ local expect = require("cc.expect").expect
+ local settings = require("settings")
+-local peripheral = require("peripheral")
+ 
+ local c = {}
+ 
+@@ -30,6 +29,7 @@
+ end
+ 
+ function c.peripheral(text, add_space)
++  local peripheral = require("peripheral")
+   return c.choice(text, peripheral.getNames(), add_space)
+ end
+ 

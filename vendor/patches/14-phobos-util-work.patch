@@ -1,0 +1,43 @@
+--- src/util.lua
++++ vendor/phobos/util.lua
+@@ -1,3 +1,30 @@
++
++-- Ephemeral synchronous compiler context, never attached to AST/prototypes.
++local work_guard
++local function spend_work(amount)
++  if work_guard then work_guard(amount or 1) end
++end
++
++local function with_work(spend, action, ...)
++  local previous = work_guard
++  work_guard = spend
++  local result = table.pack(pcall(action, ...))
++  work_guard = previous
++  if not result[1] then error(result[2], 0) end
++  return table.unpack(result, 2, result.n)
++end
++
++local function with_depth(context, action, ...)
++  if not context then return action(...) end
++  spend_work()
++  local previous = context.depth
++  if previous >= context.limit then error(context.message, 0) end
++  context.depth = previous + 1
++  local result = table.pack(pcall(action, ...))
++  context.depth = previous
++  if not result[1] then error(result[2], 0) end
++  return table.unpack(result, 2, result.n)
++end
+ 
+ ---converts an integer to a "floating point byte", represented as\
+ ---cSpell: disable-next-line\
+@@ -395,6 +422,9 @@
+ 
+ return {
+   number_to_floating_byte = number_to_floating_byte,
++  spend_work = spend_work,
++  with_work = with_work,
++  with_depth = with_depth,
+   floating_byte_to_number = floating_byte_to_number,
+   invert = invert,
+   clear_table = clear_table,

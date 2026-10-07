@@ -1,0 +1,853 @@
+--- src/compiler.lua
++++ vendor/phobos/compiler.lua
+@@ -1,8 +1,8 @@
+ 
+-local phobos_consts = require("constants")
+-local util = require("util")
+-local ast = require("ast_util")
+-local opcode_util = require("opcode_util")
++local phobos_consts = require("__computer_core_2__.vendor.phobos.constants")
++local util = require("__computer_core_2__.vendor.phobos.util")
++local ast = require("__computer_core_2__.vendor.phobos.ast_util")
++local opcode_util = require("__computer_core_2__.vendor.phobos.opcode_util")
+ local opcodes = opcode_util.opcodes
+ 
+ ----------------------------------------------------------------------
+@@ -70,6 +70,7 @@
+       first_index = regs[num_results].index
+     end
+     for i = num_results - 1, 1, -1 do
++      util.spend_work()
+       first_index = first_index + 1
+       if regs[i].index ~= first_index then
+         return false
+@@ -83,6 +84,7 @@
+   end
+ 
+   local function create_temp_reg(func, index)
++    util.spend_work()
+     return {
+       index = index or peek_next_reg_index(func),
+       level = get_current_level(func), -- TODO: what are these even for
+@@ -123,6 +125,7 @@
+ 
+   local function release_temp_regs(regs, func, stop_at)
+     for _, reg in ipairs(regs) do
++      util.spend_work()
+       release_temp_reg(reg, func, stop_at)
+     end
+   end
+@@ -133,6 +136,7 @@
+       error("Attempted to release registers down to "..reg_index.." when top was "..get_top(func))
+     end
+     for i = get_top(func), reg_index + 1, -1 do
++      util.spend_work()
+       release_reg(func.stack.active_registers[i], func)
+     end
+   end
+@@ -165,7 +169,8 @@
+   end
+ 
+   local generate_expr_code
+-  local function generate_expr(expr,num_results,func,regs)
++  local generate_expr
++  local function generate_expr_internal(expr,num_results,func,regs)
+     if num_results == -1 and not reg_is_top_or_above(regs[num_results], func) then
+       assert(false, "Attempt to generate '"..expr.node_type
+         .."' expression with var results into register "
+@@ -200,6 +205,10 @@
+     end
+   end
+ 
++  function generate_expr(expr, num_results, func, regs)
++    return util.with_depth(func.options and func.options.codegen_context, generate_expr_internal, expr, num_results, func, regs)
++  end
++
+   local function generate_exp_list(exp_list,num_results,func,regs)
+     if num_results > 0 and (#exp_list) == 0 then
+       -- it wants results but there are no expressions to generate, so just generate nil
+@@ -214,6 +223,7 @@
+     local expr_regs = {}
+     local num_exp = #exp_list
+     for i,expr in ipairs(exp_list) do
++      util.spend_work()
+       if num_results ~= -1 and i > num_results then
+         generate_expr(expr, 0, func)
+       elseif i == num_exp then
+@@ -248,6 +258,7 @@
+   local function get_lowest_captured_reg(scope, func)
+     local lowest_captured_reg
+     for _, reg in ipairs(func.stack.registers) do -- TODO: could this use active_registers? (also check other similar cases)
++      util.spend_work()
+       if reg.scope == scope and reg.upval_capture_pc then
+         if (not lowest_captured_reg) or reg.index < lowest_captured_reg.index then
+           lowest_captured_reg = reg
+@@ -257,7 +268,7 @@
+     return lowest_captured_reg
+   end
+ 
+-  local function generate_scope(scope, func, pre_block, post_block)
++  local function generate_scope_internal(scope, func, pre_block, post_block)
+     func.level = func.level + 1
+     func.scope_levels[scope] = func.level
+     local previous_scope = func.current_scope
+@@ -270,6 +281,7 @@
+     end
+     local stat = scope.body.first
+     while stat do
++      util.spend_work()
+       generate_statement(stat, func)
+       stat = stat.next
+     end
+@@ -283,6 +295,7 @@
+       -- note that the root scope might still be an exception at that point
+       local lowest_captured_reg = get_lowest_captured_reg(scope, func)
+       if lowest_captured_reg then
++        util.spend_work()
+         func.instructions[#func.instructions+1] = {
+           -- the +1 for `a` is handled after generating all code for this function
+           op = opcodes.jmp, a = lowest_captured_reg, sbx = 0,
+@@ -300,7 +313,12 @@
+   end
+ 
+ 
++  local function generate_scope(scope, func, pre_block, post_block)
++    return util.with_depth(func.options and func.options.codegen_context, generate_scope_internal, scope, func, pre_block, post_block)
++  end
++
+   local function add_constant(new_constant,func)
++    util.spend_work()
+     -- TODO: what does this mean: [...]
+     -- unless const table is too big, then fetch into temporary (and emit warning: const table too large)
+     -- (comment was from justarandomgeek originally in the binop function)
+@@ -377,15 +395,18 @@
+ 
+   local function generate_const_code_internal(expr, k, func, reg)
+     if k <= 0x3ffff then
++      util.spend_work()
+       func.instructions[#func.instructions+1] = {
+         op = opcodes.loadk, a = use_reg(reg, func), bx = k,
+         line = expr.line, column = expr.column,
+       }
+     else
++      util.spend_work()
+       func.instructions[#func.instructions+1] = {
+         op = opcodes.loadkx, a = use_reg(reg, func),
+         line = expr.line, column = expr.column,
+       }
++      util.spend_work()
+       func.instructions[#func.instructions+1] = {
+         op = opcodes.extraarg, ax = k,
+         line = expr.line, column = expr.column,
+@@ -422,6 +443,7 @@
+ 
+   local function eval_upval_indexes(target_func_proto, func)
+     for _, upval in ipairs(target_func_proto.func_def.upvals) do
++      util.spend_work()
+       upval.in_stack = ast.upval_is_in_stack(upval)
+       if upval.in_stack then
+         local reg = upval.parent_def.register
+@@ -438,6 +460,7 @@
+   local function get_real_expr(node)
+     local not_count = 0
+     while node.node_type == "unop" and node.op == "not" do
++      util.spend_work()
+       node = node.ex
+       not_count = not_count + 1
+     end
+@@ -456,6 +479,7 @@
+ 
+   local function jump_here(jumps, func)
+     for _, jump in ipairs(jumps) do
++      util.spend_work()
+       jump.sbx = #func.instructions - jump.pc
+       jump.pc = nil
+     end
+@@ -464,6 +488,7 @@
+   local function generate_move(target_reg, source_reg, position, func)
+     -- TODO: this index comparison will have to change once stack merging is implemented
+     if target_reg.index ~= source_reg.index then
++      util.spend_work()
+       func.instructions[#func.instructions+1] = {
+         op = opcodes.move, a = target_reg, b = source_reg,
+         line = position and position.line,
+@@ -522,7 +547,8 @@
+       end
+     end
+ 
+-    local function generate_test_chain(node, chain, func, jump_if_true, jump_target, store_result)
++    local generate_test_chain
++    local function generate_test_chain_internal(node, chain, func, jump_if_true, jump_target, store_result)
+       local expr = node.expr
+ 
+       if expr.node_type == "binop" then
+@@ -533,6 +559,7 @@
+           local left = create_expr(expr.left, node.inverted, node.force_bool_result) ---@type table?
+ 
+           while left and is_branchy(left.expr) do
++            util.spend_work()
+             local real_expr, not_count = get_real_expr(left.expr)
+             local inverted = eval_inverted(not_count, left.inverted)
+             local inner_jump_target
+@@ -584,6 +611,10 @@
+       end
+     end
+ 
++    function generate_test_chain(node, chain, func, jump_if_true, jump_target, store_result)
++      return util.with_depth(func.options and func.options.codegen_context, generate_test_chain_internal, node, chain, func, jump_if_true, jump_target, store_result)
++    end
++
+     local function generate_test_test(test, reg, store_result, func)
+       local expr = test.expr
+       local line = test.line
+@@ -597,11 +628,13 @@
+         and (reg.index ~= expr_reg.index)
+       then
+         -- NOTE: `reg` is not yet used (has not started yet), but this instruction references it anyway
++        util.spend_work()
+         func.instructions[#func.instructions+1] = {
+           op = opcodes.testset, a = reg, b = expr_reg, c = test.jump_if_true and 1 or 0,
+           line = line, column = column,
+         }
+       else
++        util.spend_work()
+         func.instructions[#func.instructions+1] = {
+           op = opcodes.test, a = expr_reg, c = test.jump_if_true and 1 or 0,
+           line = line, column = column,
+@@ -613,6 +646,7 @@
+         force_bool_result = test.force_bool_result,
+         jump_to_success = test.jump_to_success,
+       }
++      util.spend_work()
+       func.instructions[#func.instructions+1] = jump
+       jump.pc = #func.instructions
+       release_temp_reg(expr_reg, func)
+@@ -626,6 +660,7 @@
+ 
+       local left_reg, left_is_const = const_or_local_or_fetch(expr.left,func)
+       local right_reg, right_is_const = const_or_local_or_fetch(expr.right,func)
++      util.spend_work()
+       func.instructions[#func.instructions+1] = {
+         op = logical_binop_lut[expr.op], a = (logical_invert_lut[expr.op] ~= test.jump_if_true) and 1 or 0,
+         b = left_reg, c = right_reg,
+@@ -637,6 +672,7 @@
+         force_bool_result = test.force_bool_result,
+         jump_to_success = test.jump_to_success,
+       }
++      util.spend_work()
+       func.instructions[#func.instructions+1] = jump
+       jump.pc = #func.instructions
+       if not right_is_const then release_temp_reg(right_reg, func) end
+@@ -653,6 +689,7 @@
+         load_true = true
+       else
+         for _, jump in ipairs(jumps) do
++          util.spend_work()
+           if jump.force_bool_result then
+             if jump.jump_to_success then
+               load_true = true
+@@ -672,6 +709,7 @@
+           jump_to_success = true,
+         }
+         jumps[#jumps+1] = jump
++        util.spend_work()
+         func.instructions[#func.instructions+1] = jump
+         jump.pc = #func.instructions
+       end
+@@ -680,6 +718,7 @@
+       local false_pc
+ 
+       local function generate_loadbool(value, skip_next)
++        util.spend_work()
+         func.instructions[#func.instructions+1] = {
+           op = opcodes.loadbool, a = use_reg(reg, func), b = value and 1 or 0, c = skip_next and 1 or 0,
+           line = chain[#chain].line,
+@@ -708,6 +747,7 @@
+       end
+ 
+       for _, jump in ipairs(jumps) do
++        util.spend_work()
+         if jump.force_bool_result then
+           if jump.jump_to_success then
+             jump.sbx = true_pc - jump.pc
+@@ -733,11 +773,13 @@
+ 
+       local last_expr = create_expr(node, false, false) ---@type table?
+       repeat
++        util.spend_work()
+         last_expr = generate_test_chain(last_expr, chain, func, jump_if_true, leave_jump_target, store_result)
+       until not last_expr
+ 
+       local jumps = {}
+       for _, test in ipairs(chain) do
++        util.spend_work()
+         local function add_jump(jump)
+           local jumps_to_jump_target = jumps[test.jump_target]
+           if not jumps_to_jump_target then
+@@ -768,6 +810,7 @@
+           end
+ 
+           for _, jump in ipairs(jumps[test.jump_here_target] or {}) do
++            util.spend_work()
+             jump.sbx = #func.instructions - jump.pc
+             jump.pc = nil
+             jump.force_bool_result = nil
+@@ -788,6 +831,7 @@
+       else
+         local result = {}
+         for _, jump in ipairs(jumps) do
++          util.spend_work()
+           if jump.jump_to_success == jump_if_true then
+             result[#result+1] = jump
+           else
+@@ -838,6 +882,7 @@
+     local args_regs = {}
+     local num_args = #expr.args
+     for i = 1, num_args do
++      util.spend_work()
+       args_regs[num_args - i + 1] = create_temp_reg(func, get_top(func) + i)
+     end
+     generate_exp_list(expr.args,-1,func,args_regs)
+@@ -847,6 +892,7 @@
+       num_args = num_args + (first_arg_reg and 1 or 0)
+     end
+     local position = get_position_for_call_instruction(expr)
++    util.spend_work()
+     func.instructions[#func.instructions+1] = {
+       op = is_tail_call and opcodes.tailcall or opcodes.call,
+       a = func_reg, b = num_args + 1, c = not is_tail_call and num_results + 1 or nil,
+@@ -860,11 +906,13 @@
+       assert(num_results >= 1, "Impossible because generate_expr makes sure this isn't the case")
+       temp_regs = {}
+       for i = 1, num_results do
++        util.spend_work()
+         temp_regs[num_results - i + 1] = create_temp_reg(func, func_reg.index - 1 + i)
+       end
+     end
+     use_reg(temp_regs[num_results], func) -- num_results may be -1 or 0
+     for i = num_results - 1, 1, -1 do -- num_results itself is used above
++      util.spend_work()
+       use_reg(temp_regs[i], func)
+     end
+     release_temp_regs(args_regs, func)
+@@ -874,6 +922,7 @@
+     release_temp_reg(func_reg, func)
+     if need_temps then
+       for i = num_results, 1, -1 do
++        util.spend_work()
+         generate_move(use_reg(regs[i], func), temp_regs[i], position, func)
+       end
+       release_temp_regs(temp_regs, func)
+@@ -909,6 +958,7 @@
+         -- maybe these 2 should be used after the instruction
+         use_reg(func_reg, func)
+         use_reg(first_arg_reg, func)
++        util.spend_work()
+         func.instructions[#func.instructions+1] = {
+           op = opcodes.self, a = func_reg, b = ex_reg, c = suffix_reg,
+           line = node.colon_token and node.colon_token.line,
+@@ -926,6 +976,7 @@
+       generate_move(use_reg(regs[num_results], func), find_local(expr), expr, func)
+     end,
+     upval_ref = function(expr,num_results,func,regs)
++      util.spend_work()
+       func.instructions[#func.instructions+1] = {
+         op = opcodes.getupval, a = use_reg(regs[num_results], func), b = find_upval(expr),
+         line = expr.line, column = expr.column,
+@@ -938,6 +989,7 @@
+       elseif bin_opcode_lut[expr.op] then
+         local left_reg, left_is_const = const_or_local_or_fetch(expr.left,func)
+         local right_reg, right_is_const = const_or_local_or_fetch(expr.right,func)
++        util.spend_work()
+         func.instructions[#func.instructions+1] = {
+           op = bin_opcode_lut[expr.op], a = use_reg(regs[num_results], func), b = left_reg, c = right_reg,
+           line = expr.op_token and expr.op_token.line,
+@@ -955,6 +1007,7 @@
+         test_expr_with_result(expr, regs[num_results], func)
+       else
+         local src_reg = local_or_fetch(expr.ex,func)
++        util.spend_work()
+         func.instructions[#func.instructions+1] = {
+           op = un_opcodes[expr.op], a = use_reg(regs[num_results], func), b = src_reg,
+           line = expr.op_token and expr.op_token.line,
+@@ -969,10 +1022,12 @@
+       local num_exp = #expr.exp_list
+       local temp_regs = {}
+       for i = 1, num_exp do
++        util.spend_work()
+         temp_regs[num_exp - i + 1] = create_temp_reg(func, get_top(func) + i)
+       end
+       generate_exp_list(expr.exp_list,num_exp,func,temp_regs)
+       local position = expr.op_tokens and expr.op_tokens[1]
++      util.spend_work()
+       func.instructions[#func.instructions+1] = {
+         op = opcodes.concat, a = use_reg(regs[num_results], func),
+         b = temp_regs[num_exp], c = temp_regs[1],
+@@ -984,6 +1039,7 @@
+     number = generate_const_code,
+     string = generate_const_code,
+     boolean = function(expr,num_results,func,regs)
++      util.spend_work()
+       func.instructions[#func.instructions+1] = {
+         op = opcodes.loadbool, a = use_reg(regs[num_results], func), b = expr.value and 1 or 0, c = 0,
+         line = expr.line, column = expr.column,
+@@ -996,12 +1052,14 @@
+         -- only combine if prev was loadnil and stops loading nils just before regs[num_results].index
+         prev.b = prev.b + num_results
+       else
++        util.spend_work()
+         func.instructions[#func.instructions+1] = {
+           op = opcodes.loadnil, a = regs[num_results], b = num_results - 1, -- from a to a + b
+           line = expr.line, column = expr.column,
+         }
+       end
+       for i = num_results, 1, -1 do
++        util.spend_work()
+         use_reg(regs[i], func, #func.instructions)
+       end
+     end,
+@@ -1013,6 +1071,7 @@
+         line = expr.open_token and expr.open_token.line,
+         column = expr.open_token and expr.open_token.column,
+       }
++      util.spend_work()
+       func.instructions[#func.instructions+1] = new_tab
+       local initial_top = get_top(func)
+       local fields_count = #expr.fields
+@@ -1030,6 +1089,7 @@
+         -- this will also be `nil` because there is no `0` field
+           or expr.comma_tokens[field_index]
+           or func.instructions[#func.instructions] -- fallback in both cases
++        util.spend_work()
+         func.instructions[#func.instructions+1] = {
+           op = opcodes.setlist, a = tab_reg, b = count, c = flush_count,
+           line = position.line,
+@@ -1039,6 +1099,7 @@
+       end
+ 
+       for i,field in ipairs(expr.fields) do
++        util.spend_work()
+         if field.type == "list" then
+           -- if list accumulate values
+           local temp_regs = {}
+@@ -1060,6 +1121,7 @@
+           -- if rec, set in table immediately
+           local key_reg, key_is_const = const_or_local_or_fetch(field.key, func)
+           local value_reg, value_is_const = const_or_local_or_fetch(field.value, func)
++          util.spend_work()
+           func.instructions[#func.instructions+1] = {
+             op = opcodes.settable, a = tab_reg, b = key_reg, c = value_reg,
+             line = field.eq_token and field.eq_token.line,
+@@ -1084,6 +1146,7 @@
+       -- OP_CLOSURE runs `checkGC(L, ra + 1);` so we have to generate closures at the top of the stack
+       local temp_reg = use_reg(create_temp_reg(func), func)
+       local func_token = expr.func_def.function_token
++      util.spend_work()
+       func.instructions[#func.instructions+1] = {
+         op = opcodes.closure, a = temp_reg, bx = expr.func_def.index,
+         line = func_token and func_token.line,
+@@ -1111,21 +1174,25 @@
+         temp_regs = {}
+         local top = get_top(func)
+         for i = 1, num_results do
++          util.spend_work()
+           temp_regs[num_results - i + 1] = create_temp_reg(func, top + i)
+         end
+       end
+       for i = num_results, 1, -1 do
++        util.spend_work()
+         use_reg(temp_regs[i], func)
+       end
+       if num_results == -1 then
+         use_reg(temp_regs[-1], func)
+       end
++      util.spend_work()
+       func.instructions[#func.instructions+1] = {
+         op = opcodes.vararg, a = temp_regs[num_results], b = num_results + 1,
+         line = expr.line, column = expr.column,
+       }
+       if need_temps then
+         for i = num_results, 1, -1 do
++          util.spend_work()
+           generate_move(use_reg(regs[i], func), temp_regs[i], expr, func)
+         end
+         release_temp_regs(temp_regs, func)
+@@ -1136,6 +1203,7 @@
+       local ex_reg, is_upval = upval_or_local_or_fetch(expr.ex,func)
+       local suffix_reg, suffix_is_const = const_or_local_or_fetch(expr.suffix,func)
+       local position = ast.get_main_position(expr)
++      util.spend_work()
+       func.instructions[#func.instructions+1] = {
+         op = is_upval and opcodes.gettabup or opcodes.gettable,
+         a = use_reg(regs[num_results], func), b = ex_reg, c = suffix_reg,
+@@ -1169,6 +1237,7 @@
+     local scopes_that_matter_lut = {}
+     local scope = go.scope
+     while true do
++      util.spend_work()
+       scopes_that_matter_lut[scope] = true
+       if scope == label_position.scope then
+         break
+@@ -1183,6 +1252,7 @@
+       end
+     end
+     for _, reg in ipairs(func.stack.registers) do
++      util.spend_work()
+       if scopes_that_matter_lut[reg.scope] and reg.upval_capture_pc and reg.upval_capture_pc < go.pc then
+         if is_backwards then
+           if (reg.in_scope_at or reg.start_at) > label_position.pc then -- goes out of scope when jumping back
+@@ -1205,6 +1275,7 @@
+   local function patch_breaks_to_jump_here(loop_stat, func)
+     if loop_stat.linked_breaks then
+       for _, break_stat in ipairs(loop_stat.linked_breaks) do
++        util.spend_work()
+         break_stat.inst.sbx = #func.instructions - break_stat.pc
+         break_stat.inst = nil
+         break_stat.pc = nil
+@@ -1216,6 +1287,7 @@
+     localstat = function(stat,func)
+       local regs = {}
+       for i, local_ref in ipairs(stat.lhs) do
++        util.spend_work()
+         regs[#stat.lhs - i + 1] = create_local_reg(local_ref.reference_def, func, get_top(func) + i)
+       end
+       if stat.rhs then
+@@ -1232,6 +1304,7 @@
+       local original_top = get_top(func)
+       local lefts = {}
+       for i,left in ipairs(stat.lhs) do
++        util.spend_work()
+         if left.node_type == "local_ref" then
+           lefts[i] = {
+             type = "local",
+@@ -1257,6 +1330,7 @@
+ 
+       local function generate_settabup_or_settable(left, lhs_expr, right_reg)
+         local position = ast.get_main_position(lhs_expr)
++        util.spend_work()
+         func.instructions[#func.instructions+1] = {
+           op = left.ex_is_upval and opcodes.settabup or opcodes.settable,
+           a = left.ex_reg, b = left.suffix_reg, c = right_reg,
+@@ -1265,6 +1339,7 @@
+       end
+ 
+       local function generate_setupval(left, lhs_expr, right_reg)
++        util.spend_work()
+         func.instructions[#func.instructions+1] = {
+           op = opcodes.setupval, a = right_reg, b = left.upval_idx, -- up(b) := r(a)
+           line = lhs_expr.line, column = lhs_expr.column,
+@@ -1273,6 +1348,7 @@
+ 
+       local function assign_from_temps(temp_regs, num_lhs, move_last_local)
+         for i = num_lhs, 1, -1 do
++          util.spend_work()
+           local left = lefts[i]
+           local right_reg = temp_regs[num_lhs - i + 1]
+           if left.type == "index" then
+@@ -1306,6 +1382,7 @@
+         -- 1) generate rhs into temporaries, up to second last left hand side
+         local exp_list = {}
+         for i = 1, num_lhs - 1 do
++          util.spend_work()
+           temp_regs[num_lhs - 1 - i + 1] = create_temp_reg(func, get_top(func) + i)
+           exp_list[i] = stat.rhs[i]
+         end
+@@ -1330,6 +1407,7 @@
+ 
+         -- 3) generate the rest of the right hand side with 0 results
+         for i = num_lhs + 1, num_rhs do
++          util.spend_work()
+           generate_expr(stat.rhs[i], 0, func)
+         end
+ 
+@@ -1339,6 +1417,7 @@
+         -- 1) generate rhs into temporaries.
+         --    most right reg may not be a temporary if most right lhs is a local ref
+         for i = 1, num_lhs - 1 do
++          util.spend_work()
+           temp_regs[num_lhs - i + 1] = create_temp_reg(func, get_top(func) + i)
+         end
+         if lefts[num_lhs].type == "local" then
+@@ -1357,6 +1436,7 @@
+       -- but doing it manually like this makes it clear what temps were used
+       release_temp_regs(temp_regs, func)
+       for i = num_lhs, 1, -1 do
++        util.spend_work()
+         if lefts[i].type == "index" then
+           if not lefts[i].suffix_is_const then
+             release_temp_reg(lefts[i].suffix_reg, func)
+@@ -1372,6 +1452,7 @@
+       local func_reg = create_local_reg(stat.name.reference_def, func)
+       local func_token = stat.func_def.function_token
+       -- CLOSURE into that register
++      util.spend_work()
+       func.instructions[#func.instructions+1] = {
+         op = opcodes.closure, a = use_reg(func_reg, func), bx = stat.func_def.index,
+         line = func_token and func_token.line, column = func_token and func_token.column,
+@@ -1397,6 +1478,7 @@
+       local prev_failure_jumps
+       local finish_jumps = {}
+       for _,if_block in ipairs(stat.ifs) do
++        util.spend_work()
+         -- generate a value and `test` it...
+         prev_failure_jumps = test_expr_and_jump(if_block.condition, false, func)
+ 
+@@ -1409,6 +1491,7 @@
+           column = get_last_used_column(func),
+         }
+         finish_jumps[#finish_jumps+1] = finish_jump
++        util.spend_work()
+         func.instructions[#func.instructions+1] = finish_jump
+         finish_jump.pc = #func.instructions
+ 
+@@ -1424,12 +1507,14 @@
+           finish_jumps[#finish_jumps] = nil
+           if prev_failure_jumps then
+             for _, jump in ipairs(prev_failure_jumps) do
++              util.spend_work()
+               jump.sbx = jump.sbx - 1
+             end
+           end
+         end
+       end
+       for _, finish_jump in ipairs(finish_jumps) do
++        util.spend_work()
+         finish_jump.sbx = #func.instructions - finish_jump.pc
+         finish_jump.pc = nil
+       end
+@@ -1443,6 +1528,7 @@
+       local jump, jump_pc
+ 
+       for i, name in ipairs{"(for generator)", "(for state)", "(for control)"} do
++        util.spend_work()
+         local reg = create_temp_reg(func, get_top(func) + i)
+         reg.name = name
+         regs[3 - i + 1] = reg
+@@ -1455,6 +1541,7 @@
+         line = stat.do_token and stat.do_token.line,
+         column = stat.do_token and stat.do_token.column,
+       }
++      util.spend_work()
+       func.instructions[#func.instructions+1] = jump
+       jump_pc = #func.instructions
+ 
+@@ -1462,6 +1549,7 @@
+         -- use regs for locals
+         -- released by generate_scope
+         for _, local_ref in ipairs(stat.name_list) do
++          util.spend_work()
+           use_reg(create_local_reg(local_ref.reference_def, func), func)
+         end
+       end
+@@ -1469,11 +1557,13 @@
+       generate_scope(stat, func, pre_block)
+ 
+       jump.sbx = #func.instructions - jump_pc
++      util.spend_work()
+       func.instructions[#func.instructions+1] = {
+         op = opcodes.tforcall, a = regs[3], c = #stat.name_list, -- a=func, c=num loop vars
+         line = stat.for_token and stat.for_token.line,
+         column = stat.for_token and stat.for_token.column,
+       }
++      util.spend_work()
+       func.instructions[#func.instructions+1] = {
+         -- sbx: jump back to just start of body
+         op = opcodes.tforloop, a = regs[1], sbx = jump_pc - (#func.instructions + 1),
+@@ -1515,6 +1605,7 @@
+           line = stat.do_token and stat.do_token.line,
+           column = stat.do_token and stat.do_token.column,
+         }
++        util.spend_work()
+         func.instructions[#func.instructions+1] = forprep_inst
+         forprep_pc = #func.instructions
+       end
+@@ -1522,6 +1613,7 @@
+       generate_scope(stat, func, pre_block)
+ 
+       forprep_inst.sbx = #func.instructions - forprep_pc
++      util.spend_work()
+       func.instructions[#func.instructions+1] = {
+         op = opcodes.forloop, a = index_reg, sbx = forprep_pc - (#func.instructions + 1),
+         line = stat.for_token and stat.for_token.line,
+@@ -1540,6 +1632,7 @@
+       -- generate body
+       generate_scope(stat, func)
+       -- jump back
++      util.spend_work()
+       func.instructions[#func.instructions+1] = {
+         op = opcodes.jmp, a = 0, sbx = start_pc - (#func.instructions + 1),
+         line = stat.end_token and stat.end_token.line,
+@@ -1558,6 +1651,7 @@
+       generate_scope(stat, func, nil, function()
+         local lowest_captured_reg = get_lowest_captured_reg(stat, func)
+         for _, jump in ipairs(test_expr_and_jump(stat.condition, false, func)) do
++          util.spend_work()
+           -- jump back if it failed
+           jump.sbx = start_pc - jump.pc
+           jump.pc = nil
+@@ -1598,6 +1692,7 @@
+           local are_sequential_locals = true
+           local first_local_reg
+           for i, expr in ipairs(stat.exp_list) do
++            util.spend_work()
+             if expr.node_type == "local_ref" then
+               if i == 1 then
+                 first_local_reg = find_local(expr)
+@@ -1616,6 +1711,7 @@
+           else
+             -- have to use temporaries and actually generate the expression list
+             for i = 1, num_results do
++              util.spend_work()
+               temp_regs[num_results - i + 1] = create_temp_reg(func, get_top(func) + i)
+             end
+             first_reg = temp_regs[num_results]
+@@ -1627,6 +1723,7 @@
+         end
+       end
+ 
++      util.spend_work()
+       func.instructions[#func.instructions+1] = {
+         op = opcodes["return"], a = first_reg, b = num_results + 1,
+         line = stat.return_token and stat.return_token.line,
+@@ -1645,6 +1742,7 @@
+       }
+       func.label_positions[stat] = label_position
+       for _, go in ipairs(stat.linked_gotos) do
++        util.spend_work()
+         if go.inst then
+           -- forwards jump
+           go.inst.sbx = #func.instructions - go.pc
+@@ -1662,6 +1760,7 @@
+         line = stat.goto_token and stat.goto_token.line,
+         column = stat.goto_token and stat.goto_token.column,
+       }
++      util.spend_work()
+       func.instructions[#func.instructions+1] = inst
+       stat.pc = #func.instructions
+       stat.scope = func.current_scope
+@@ -1684,6 +1783,7 @@
+         line = stat.break_token and stat.break_token.line,
+         column = stat.break_token and stat.break_token.column,
+       }
++      util.spend_work()
+       func.instructions[#func.instructions+1] = inst
+       stat.inst = inst
+       stat.pc = #func.instructions
+@@ -1691,6 +1791,7 @@
+       local scopes_that_matter_lut = {}
+       local scope = func.current_scope
+       while true do
++        util.spend_work()
+         scopes_that_matter_lut[scope] = true
+         if scope == stat.linked_loop then
+           break
+@@ -1700,6 +1801,7 @@
+       -- this is copy paste from `generate_scope`
+       local lowest_captured_reg
+       for _, reg in ipairs(func.stack.registers) do
++        util.spend_work()
+         -- except this condition
+         if scopes_that_matter_lut[reg.scope]
+           and reg.upval_capture_pc
+@@ -1744,6 +1846,7 @@
+       local start_pc = #func.instructions
+       generate_scope(stat, func)
+       if stat.do_jump_back then
++        util.spend_work()
+         func.instructions[#func.instructions+1] = {
+           op = opcodes.jmp, a = 0, sbx = start_pc - (#func.instructions + 1),
+           line = stat.close_token and stat.close_token.line,
+@@ -1755,7 +1858,7 @@
+   }
+   ---@param functiondef AstMain|AstFunctionDef
+   ---@param options Options?
+-  function generate_code(functiondef, options)
++  local function generate_code_internal(functiondef, options)
+     local stack = create_stack()
+     stack.max_stack_size = 2
+     local func = {
+@@ -1786,6 +1889,7 @@
+ 
+     local upvals = func.upvals
+     for i,upval in ipairs(functiondef.upvals) do
++      util.spend_work()
+       local index = i - 1 -- *ZERO BASED* index
+       upvals[i] = {
+         index = index,
+@@ -1811,6 +1915,7 @@
+     end
+ 
+     for i,func_proto in ipairs(functiondef.func_protos) do
++      util.spend_work()
+       -- temporary, needed for closures to know the function index
+       func_proto.index = i - 1 -- *ZERO BASED* index
+     end
+@@ -1818,6 +1923,7 @@
+     -- compile
+     generate_scope(functiondef, func, function()
+       for _, loc in ipairs(functiondef.locals) do
++        util.spend_work()
+         if loc.whole_block then
+           use_reg(create_local_reg(loc, func), func)
+         end
+@@ -1848,7 +1954,9 @@
+ 
+     -- normalize register indexes
+     for _, inst in ipairs(func.instructions) do
++      util.spend_work()
+       for k, v in pairs(inst.op.params) do
++        util.spend_work()
+         if v == opcode_util.param_types.register then
+           local reduce = inst.op.reduce_if_not_zero[k]
+           if reduce then
+@@ -1875,6 +1983,7 @@
+ 
+     -- debug_registers cleanup
+     for _, reg in ipairs(func.debug_registers) do
++      util.spend_work()
+       reg.level = nil
+       reg.scope = nil
+       reg.in_scope_at = nil
+@@ -1882,20 +1991,25 @@
+ 
+     -- cleanup
+     for _,func_proto in ipairs(functiondef.func_protos) do
++      util.spend_work()
+       func_proto.index = nil
+     end
+ 
+     -- this is a bit of a hack to use scope_levels to get all scopes, but it works
+     for scope in pairs(func.scope_levels) do
++      util.spend_work()
+       for _, loc in ipairs(scope.locals) do
++        util.spend_work()
+         loc.register = nil
+       end
+     end
+ 
+     for _,upval in ipairs(func.upvals) do
++      util.spend_work()
+       upval.index = nil
+     end
+     for _,upval in ipairs(functiondef.upvals) do
++      util.spend_work()
+       upval.index = nil
+     end
+ 
+@@ -1911,11 +2025,15 @@
+ 
+     -- inner_functions
+     for i, func_proto in ipairs(functiondef.func_protos) do
+-      func.inner_functions[i] = generate_code(func_proto)
++      util.spend_work()
++      func.inner_functions[i] = generate_code(func_proto, options)
+     end
+ 
+     return func
+   end
++  function generate_code(functiondef, options)
++    return util.with_depth(options and options.codegen_context, generate_code_internal, functiondef, options)
++  end
+ end
+ 
+ return generate_code

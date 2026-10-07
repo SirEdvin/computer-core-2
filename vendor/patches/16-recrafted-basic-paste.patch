@@ -1,0 +1,63 @@
+--- data/computercraft/lua/rom/editors/basic.lua
++++ vendor/recrafted/rom/editors/basic.lua
+@@ -41,20 +41,29 @@
+   end
+ end
+ 
++local drawn, drawn_status, drawn_w, drawn_h = {}, nil, nil, nil
+ local function redraw()
+   local w, h = term.getSize()
++  if w ~= drawn_w or h ~= drawn_h then drawn, drawn_status = {}, nil end
++  drawn_w, drawn_h = w, h
+ 
+   for i=1, h - 1, 1 do
+     local to_write = state.lines[state.scroll + i] or ""
+     if state.cx > w then
+       to_write = to_write:sub(state.cx - (w-1))
+     end
+-    term.at(1, i).clearLine()
+-    term.write(to_write)
+-  end
+-
+-  term.at(1, h).clearLine()
+-  textutils.coloredWrite(colors.yellow, state.status, colors.white)
++    if drawn[i] ~= to_write then
++      term.at(1, i).clearLine()
++      term.write(to_write)
++      drawn[i] = to_write
++    end
++  end
++
++  if drawn_status ~= state.status then
++    term.at(1, h).clearLine()
++    textutils.coloredWrite(colors.yellow, state.status, colors.white)
++    drawn_status = state.status
++  end
+ 
+   term.setCursorPos(math.min(w, state.cx), state.cy - state.scroll)
+ end
+@@ -133,6 +142,24 @@
+     state.cx = state.cx + 1
+ 
+     state.lines[state.cy] = line
++
++  elseif event == "paste" then
++    id = id:gsub("\r\n", "\n"):gsub("\r", "\n")
++    state.unsaved = true
++    local start = 1
++    while true do
++      local newline = id:find("\n", start, true)
++      local text = newline and id:sub(start, newline - 1) or id:sub(start)
++      local line = state.lines[state.cy]
++      line = line:sub(1, state.cx - 1) .. text .. line:sub(state.cx)
++      state.cx = state.cx + #text
++      state.lines[state.cy] = line
++      if not newline then break end
++      state.lines[state.cy] = line:sub(1, state.cx - 1)
++      table.insert(state.lines, state.cy + 1, line:sub(state.cx))
++      state.cy, state.cx, start = state.cy + 1, 1, newline + 1
++    end
++    state.scroll = math.max(0, math.min(#state.lines - h + 1, state.cy - h + scroll_offset))
+ 
+   elseif event == "key" then
+     id = keys.getName(id)

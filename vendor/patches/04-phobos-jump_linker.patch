@@ -1,0 +1,116 @@
+--- src/jump_linker.lua
++++ vendor/phobos/jump_linker.lua
+@@ -1,7 +1,7 @@
+ 
+-local util = require("util")
+-local ast = require("ast_util")
+-local error_code_util = require("error_code_util")
++local util = require("__computer_core_2__.vendor.phobos.util")
++local ast = require("__computer_core_2__.vendor.phobos.ast_util")
++local error_code_util = require("__computer_core_2__.vendor.phobos.error_code_util")
+ 
+ local function get_position(node)
+   local position = ast.get_main_position(node)
+@@ -23,7 +23,8 @@
+ end
+ 
+ ---@param func AstFunctionDef
+-local function link(func)
++local function link(func, spend)
++  spend()
+   local gotos = {}
+   local label_stack = {}
+   ---any elements in `label_stack` with a higher index than
+@@ -35,6 +36,7 @@
+   local loop_count = 0
+ 
+   local function walk_body(body, level)
++    spend()
+     ---any goto defined before the latest new local in this block would
+     ---jump into the scope of said local which is not allowed.\
+     ---this does of course not affect goto statements defined in lower levels,
+@@ -53,6 +55,7 @@
+ 
+       -- solve backwards references
+       for j = visible_label_count, 1, -1 do
++        spend()
+         local label = label_stack[j]
+         if label.name == goto_stat.target_name then
+           goto_stat.linked_label = label
+@@ -81,6 +84,7 @@
+             end_of_body = true
+             stat = stat.next
+             while stat do
++              spend()
+               if stat.node_type ~= "label" and stat.node_type ~= "empty" then
+                 end_of_body = false
+                 break
+@@ -94,6 +98,7 @@
+ 
+       -- solve forward references
+       for _, go in ipairs(gotos) do
++        spend()
+         if (not go.stat.linked_label)
+           and go.lowest_level == level
+           and go.stat.target_name == label_stat.name
+@@ -136,6 +141,7 @@
+       local goto_count = #gotos
+       walk_body(inner_body, level + 1)
+       for i = goto_count + 1, #gotos do
++        spend()
+         -- any new gotos defined in that body get treated as if they were defined in
+         -- the current body at the location of the inner body.
+         -- however it also has to keep track of the lowest level a goto was ever in
+@@ -148,6 +154,7 @@
+ 
+     local stat = body.first
+     while stat do
++      spend()
+       if stat.node_type == "gotostat" then
+         walk_goto(stat, stat)
+       elseif stat.node_type == "label" then
+@@ -163,6 +170,7 @@
+         walk_inner_body(stat, stat.body)
+       elseif stat.node_type == "ifstat" then
+         for _, ifstat in ipairs(stat.ifs) do
++          spend()
+           walk_inner_body(stat, ifstat.body)
+         end
+         if stat.elseblock then
+@@ -183,6 +191,7 @@
+ 
+   -- all gotos without a label at the end of the function are unlinked and an error
+   for _, go in ipairs(gotos) do
++    spend()
+     if not go.stat.linked_label and not go.label_is_in_scope_but_jump_is_invalid then
+       add_error(func, error_code_util.codes.no_visible_label, go.stat, {go.stat.target_name})
+     end
+@@ -190,18 +199,23 @@
+ end
+ 
+ ---@param func AstFunctionDef
+-local function link_recursive(func)
+-  link(func)
++local function link_recursive(func, spend)
++  spend()
++  link(func, spend)
+   for _, inner_func in ipairs(func.func_protos) do
+-    link_recursive(inner_func)
++    spend()
++    link_recursive(inner_func, spend)
+   end
+ end
+ 
+ ---@param func AstFunctionDef
+-return function(func)
++---@param spend? fun() Called before each bounded linker work unit.
++return function(func, spend)
++  spend = spend or function() end
+   error_code_insts = {}
+   local result_error_code_insts = error_code_insts
+-  link_recursive(func)
++  local ok, failure = pcall(link_recursive, func, spend)
+   error_code_insts = nil
++  if not ok then error(failure, 0) end
+   return result_error_code_insts
+ end

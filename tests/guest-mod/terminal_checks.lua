@@ -1,0 +1,41 @@
+-- Engine integration checks of the actual native model, not GUI mocks.
+local T = require("__computer_core_2__.scripts.guest.terminal")
+return function(check)
+  local m = T.methods
+  for _, size in ipairs({{51, 19}, {80, 24}, {1, 1}, {160, 60}}) do
+    local display = T.new(size[1], size[2])
+    local w, h = m.getSize(display)
+    check("bounded terminal geometry " .. w .. "x" .. h, w == size[1] and h == size[2] and #display.lines == h and #display.lines[h].text == w)
+    m.setCursorPos(display, 1, 1)
+    m.write(display, "X")
+    assert(display.lines[1].text:sub(1, 1) == "X")
+    m.scroll(display, 2147483647)
+    assert(display.lines[1].text == string.rep(" ", w))
+    m.scroll(display, -2147483647)
+    assert(display.lines[h].text == string.rep(" ", w))
+  end
+  check("terminal geometry rejects overflow", not pcall(T.new, 161, 60) and not pcall(T.new, 51, 61) and not pcall(T.new, 0, 19))
+  local d = T.new(8, 4)
+  m.setCursorPos(d, -1, 2)
+  m.blit(d, "WXYZ", "0123", "fedc")
+  check("terminal clipping retains independent bytes and colors", d.lines[2].text == "YZ      " and d.lines[2].foreground == "23000000" and d.lines[2].background == "dcffffff" and d.x == 3)
+  local line, revision = d.lines[2].text, d.revision
+  check("invalid blit is atomic", not pcall(m.blit, d, "ab", "01", "fZ") and d.lines[2].text == line and d.revision == revision and d.x == 3)
+  check("invalid palette is atomic", not pcall(m.setPaletteColor, d, 1, 0.1, nil, 0.3) and d.revision == revision)
+  m.setPaletteColor(d, 4, 0.1, 0.2, 0.3)
+  check("palette changes affect existing indices without rewriting cells", d.palette[3].r == 0.1 and d.lines[2].foreground:sub(1, 1) == "2" and d.dirty[2])
+  m.setCursorPos(d, 1, 3)
+  m.write(d, "third")
+  m.scroll(d, 1)
+  check("positive scroll moves rows up", d.lines[1].text == "YZ      " and d.lines[2].text == "third   " and d.lines[4].text == "        ")
+  m.scroll(d, -1)
+  check("negative scroll moves rows down", d.lines[2].text == "YZ      " and d.lines[3].text == "third   " and d.lines[1].text == "        ")
+  m.setTextColor(d, 8)
+  m.setBackgroundColour(d, 16)
+  m.setCursorPos(d, -10, 999)
+  m.setCursorBlink(d, true)
+  check("grow preserves cells, cursor and palette", T.reconcile(d, 10, 5) and d.lines[2].text == "YZ        " and d.lines[2].foreground == "2300000033" and d.lines[5].background == "4444444444" and d.x == -10 and d.y == 999 and d.blink and d.palette[3].r == 0.1)
+  check("shrink clips only the display", T.reconcile(d, 2, 2) and d.lines[2].text == "YZ" and #d.lines == 2)
+  local before = d.revision
+  check("unchanged dimensions do not emit resize", not T.reconcile(d, 2, 2) and d.revision == before)
+end

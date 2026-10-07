@@ -1,0 +1,31 @@
+--- data/computercraft/lua/rom/modules/main/rc/thread.lua
++++ vendor/recrafted/rom/modules/main/rc/thread.lua
+@@ -130,13 +130,15 @@
+ end
+ 
+ function api.getTerm()
+-  return current and current.tab and current.tab.term or term.native()
++  local tab = current and current.tab or tabs[focused]
++  return tab and tab.term or term.native()
+ end
+ 
+ function api.setTerm(new)
+-  if tabs[focused] then
+-    local old = tabs[focused].term
+-    tabs[focused].term = new
++  local tab = current and current.tab or tabs[focused]
++  if tab then
++    local old = tab.term or term.native()
++    tab.term = new
+     return old
+   end
+ end
+@@ -371,6 +373,8 @@
+ 
+     if event[1] == "term_resize" then
+       wrappedNative.reposition(1, 1, _native.getSize())
++      -- Update tab geometry before their programs observe the resize event.
++      redraw()
+     end
+ 
+     if processEvent(event) then

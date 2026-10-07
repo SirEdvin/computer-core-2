@@ -45,6 +45,17 @@ function M.get(c, path)
   local owner, key, virtual = M.resolve(c, path)
   return virtual or owner.fs[key], owner, key
 end
+-- Local-only lookup is separate from peer/virtual mount resolution.
+-- Guest services must use this entry point, never get/resolve/read.
+function M.get_local(c, path)
+  local normalized = M.path(c, path)
+  return c.fs[normalized], normalized
+end
+function M.read_local(c, path)
+  local node = M.get_local(c, path)
+  assert(node and node.type == "file", "not a local file: " .. path)
+  return node.text
+end
 function M.read(c, path)
   local node = M.get(c, path)
   assert(node and node.type == "file", "not a file: " .. path)

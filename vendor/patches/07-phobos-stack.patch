@@ -1,0 +1,9 @@
+--- src/stack.lua
++++ vendor/phobos/stack.lua
+@@ -1,5 +1,5 @@
+ 
+-local util = require("util")
++local util = require("__computer_core_2__.vendor.phobos.util")
+ 
+ local function new_stack()
+   return {size = 0}
