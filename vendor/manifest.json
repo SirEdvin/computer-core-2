@@ -197,11 +197,12 @@
       "revision": "720773ec68239504cb134cd4f9b7e8bb66a1408e",
       "source_url": "https://github.com/Ocawesome101/recrafted/blob/720773ec68239504cb134cd4f9b7e8bb66a1408e/data/computercraft/lua/bios.lua",
       "source_sha256": "9e47ccaeabd643b57b456bf24d5dc117d5ebb2e2d31cfe35b187216f9c483abf",
-      "sha256": "9e47ccaeabd643b57b456bf24d5dc117d5ebb2e2d31cfe35b187216f9c483abf",
+      "sha256": "aa4320e24e1f51919dbe926a8f3709646e9b616bcf213d6dc66d691d2fe0b466",
       "license": "MIT",
       "copyright": "Copyright (c) 2022 Ocawesome101",
       "license_path": "vendor/recrafted/LICENSE",
-      "guest_path": "/bios.lua"
+      "guest_path": "/bios.lua",
+      "patch": "vendor/patches/20-recrafted-timer-ownership.patch"
     },
     {
       "path": "vendor/recrafted/rom/apis/colors.lua",
@@ -538,7 +539,7 @@
       "revision": "720773ec68239504cb134cd4f9b7e8bb66a1408e",
       "source_url": "https://github.com/Ocawesome101/recrafted/blob/720773ec68239504cb134cd4f9b7e8bb66a1408e/data/computercraft/lua/rom/editors/advanced.lua",
       "source_sha256": "8ded400e453451e0653b23afc59cec96cb1de3d2e9d3f3f7f058d54b1fa12782",
-      "sha256": "76a492e31d829b5dfc8588cc6bd0a0ce23e8e7eb1a4960df34b8372f329c376e",
+      "sha256": "97882584d90a67ae082c38d8ca9fadd4457479bba4da7298e4f01bcda6ac2d31",
       "license": "MIT",
       "copyright": "Copyright (c) 2022 Ocawesome101",
       "license_path": "vendor/recrafted/LICENSE",
@@ -552,7 +553,7 @@
       "revision": "720773ec68239504cb134cd4f9b7e8bb66a1408e",
       "source_url": "https://github.com/Ocawesome101/recrafted/blob/720773ec68239504cb134cd4f9b7e8bb66a1408e/data/computercraft/lua/rom/editors/basic.lua",
       "source_sha256": "44e477c765457cb9526d7813c74bc12e8faeb2ab0a2560612639eb98a081cbf8",
-      "sha256": "dc08b1a47a34f71c732e87532b4fe9fd74766b337831c35b8b6a265bff961c3c",
+      "sha256": "f7d00049ae7e40c1295cfde208f7bc0571871fcdb956a847a6b5f4773853ef53",
       "license": "MIT",
       "copyright": "Copyright (c) 2022 Ocawesome101",
       "license_path": "vendor/recrafted/LICENSE",
@@ -658,11 +659,12 @@
       "revision": "720773ec68239504cb134cd4f9b7e8bb66a1408e",
       "source_url": "https://github.com/Ocawesome101/recrafted/blob/720773ec68239504cb134cd4f9b7e8bb66a1408e/data/computercraft/lua/rom/modules/main/edit/syntax.lua",
       "source_sha256": "d4ac48a6373a426d7fb50e2517cca60ff0a8effb661231c8b03777a600cf0032",
-      "sha256": "d4ac48a6373a426d7fb50e2517cca60ff0a8effb661231c8b03777a600cf0032",
+      "sha256": "410d11730c83162c4320a66beb2fcb9d34eda1157877b1eeb1ee93d75528cef0",
       "license": "MIT",
       "copyright": "Copyright (c) 2022 Ocawesome101",
       "license_path": "vendor/recrafted/LICENSE",
-      "guest_path": "/rc/modules/main/edit/syntax.lua"
+      "guest_path": "/rc/modules/main/edit/syntax.lua",
+      "patch": "vendor/patches/19-recrafted-syntax-candidates.patch"
     },
     {
       "path": "vendor/recrafted/rom/modules/main/edit/syntax/lua.lua",
@@ -1100,12 +1102,12 @@
     {
       "path": "vendor/patches/15-recrafted-advanced-paste.patch",
       "target": "vendor/recrafted/rom/editors/advanced.lua",
-      "reason": "Insert multiline paste through guest editor state, preserving suffix/cursor and dirty highlighting"
+      "reason": "Insert multiline paste through guest editor state, preserving suffix/cursor and dirty highlighting; cache rendered editor rows/status and avoid redundant full-window redraws"
     },
     {
       "path": "vendor/patches/16-recrafted-basic-paste.patch",
       "target": "vendor/recrafted/rom/editors/basic.lua",
-      "reason": "Insert multiline paste through guest editor state, preserving suffix/cursor and dirty state"
+      "reason": "Insert multiline paste through guest editor state, preserving suffix/cursor and dirty state; cache rendered editor rows/status and avoid redundant full-window redraws"
     },
     {
       "path": "vendor/patches/17-recrafted-term-paste.patch",
@@ -1116,6 +1118,16 @@
       "path": "vendor/patches/18-recrafted-window-row-redraw.patch",
       "target": "vendor/recrafted/rom/apis/window.lua",
       "reason": "Redraw only the modified row on visible write/clearLine, preserve cursor/color/blink and propagate one changed palette entry instead of recursively restoring all sixteen through every ancestor"
+    },
+    {
+      "path": "vendor/patches/19-recrafted-syntax-candidates.patch",
+      "target": "vendor/recrafted/rom/modules/main/edit/syntax.lua",
+      "reason": "Preserve rule order and token semantics while indexing literal candidates by first byte and reading source bytes without a copied character array"
+    },
+    {
+      "path": "vendor/patches/20-recrafted-timer-ownership.patch",
+      "target": "vendor/recrafted/bios.lua",
+      "reason": "Register direct timer ownership, enforce ownership together with event filters, and remove consumed/cancelled routing entries"
     }
   ],
   "excluded": [

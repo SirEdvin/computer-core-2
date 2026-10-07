@@ -22,6 +22,7 @@ local type_colors = {
 
 local lines = {}
 local linesDraw = {}
+local highlighted_source = {}
 local run, menu = true, false
 local cx, cy = 1, 1
 local scroll = 0
@@ -48,42 +49,47 @@ if not lines[1] then lines[1] = "" end
 
 local win = require("window").create(term.current(), 1, 1, term.getSize())
 
+local drawn, drawn_status, drawn_w, drawn_h, drawn_scroll = {}, nil, nil, nil, nil
+local function same_line(a, b)
+  if a == b then return true end
+  if not a or not b or #a ~= #b then return false end
+  for i = 1, #a do if a[i] ~= b[i] then return false end end
+  return true
+end
 local function redraw()
   local w, h = term.getSize()
-
-  -- this seems to provide a good responsiveness curve on my machine
   scroll_increment = math.floor(h/scroll_factor)
-
-  win.reposition(1, 1, w, h)
-
-  win.setVisible(false)
-
+  if w ~= drawn_w or h ~= drawn_h then
+    win.reposition(1, 1, w, h)
+    drawn, drawn_status = {}, nil
+  elseif drawn_scroll ~= hscroll then drawn = {} end
+  drawn_w, drawn_h, drawn_scroll = w, h, hscroll
   for i=1, h - 1, 1 do
-    local line = linesDraw[i]
-    win.setCursorPos(1 - hscroll, i)
-    win.clearLine()
-    if line then
-      for t=1, #line, 1 do
-        local item = line[t]
-        if type(item) == "number" then
-          win.setTextColor(item)
-        else
-          win.write(item)
+    local line = linesDraw[i] or false
+    if not same_line(drawn[i], line) then
+      win.setCursorPos(1 - hscroll, i)
+      win.setTextColor(colors.white)
+      win.clearLine()
+      if line then
+        for t=1, #line, 1 do
+          local item = line[t]
+          if type(item) == "number" then win.setTextColor(item)
+          else win.write(item) end
         end
       end
+      drawn[i] = line
     end
   end
-
-  win.setCursorPos(1, h)
-  win.clearLine()
-  win.setTextColor(type_colors.accent or colors.yellow)
-  win.write(status)
+  if drawn_status ~= status then
+    win.setCursorPos(1, h)
+    win.clearLine()
+    win.setTextColor(type_colors.accent or colors.yellow)
+    win.write(status)
+    drawn_status = status
+  end
   win.setTextColor(colors.white)
-
   win.setCursorPos(math.min(w, cx), cy - scroll)
   win.setCursorBlink(true)
-
-  win.setVisible(true)
 end
 
 local syntax = require("edit.syntax")
@@ -93,6 +99,8 @@ local function rehighlight()
   local line = {}
   linesDraw = {}
   local _, h = term.getSize()
+  highlighted_source = {}
+  for i = 1, h - 1 do highlighted_source[i] = lines[scroll+i] or "" end
   local text = table.concat(lines, "\n", scroll+1,
     math.min(#lines, scroll+h+1)) or ""
   for token, ttype in syntax(text) do
@@ -121,6 +129,16 @@ local function rehighlight()
   end
 end
 
+-- Text echoes immediately. Syntax waits for a short idle period instead of
+-- running the guest pattern engine synchronously after every character.
+local highlight_timer
+local function delayed_highlight(event, id)
+  if event == "timer" and id == highlight_timer then
+    highlight_timer = nil
+    rehighlight()
+    return true
+  end
+end
 local function save()
   if file == ".new" then
     local _, h = term.getSize()
@@ -146,6 +164,7 @@ end
 
 local function processInput()
   local event, id = rc.pullEvent()
+  if delayed_highlight(event, id) then return end
 
   local w, h = term.getSize()
 
@@ -287,6 +306,7 @@ end
 
 local function processMenuInput()
   local event, id = rc.pullEvent()
+  if delayed_highlight(event, id) then return end
 
   if event == "char" then
     if id:lower() == "e" then
@@ -316,8 +336,24 @@ local function processMenuInput()
   end
 end
 
+local initialized = false
 while run do
-  if changed then rehighlight() changed = false end
+  if changed then
+    if not initialized then rehighlight(); initialized = true
+    else
+      local _, h = term.getSize()
+      for i = 1, h - 1 do
+        local text = lines[scroll+i] or ""
+        if highlighted_source[i] ~= text then
+          linesDraw[i] = text ~= "" and {colors.white, text} or false
+          highlighted_source[i] = text
+        end
+      end
+      if highlight_timer then rc.cancelTimer(highlight_timer) end
+      highlight_timer = rc.startTimer(0.2)
+    end
+    changed = false
+  end
   redraw()
   if menu then
     processMenuInput()
@@ -325,3 +361,4 @@ while run do
     processInput()
   end
 end
+if highlight_timer then rc.cancelTimer(highlight_timer) end

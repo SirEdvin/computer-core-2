@@ -21,7 +21,7 @@ end)
 script.on_event(defines.events.on_tick, function()
   L.tick()
   R.tick()
-  if game.tick % 6 == 0 then GUI.tick() end
+  GUI.tick() -- Row-diffed presentation; typing no longer waits for a six-tick poll.
 end)
 local function built(event)
   L.build(event.entity or event.created_entity or event.destination, event.tags)

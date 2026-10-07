@@ -71,3 +71,36 @@ failed outdated hard-coded scheduling assumptions, then the intentionally dense
 queue-flood fixture encountered the unchanged native-event work quota. Both
 failures remain failures in their original logs; corrected packaged reruns pass.
 Compiler/resource and actual multiplayer/client responsiveness remain provisional.
+
+## 0.2.2 terminal typing hotfix
+
+- Archive: `computer_core_2_0.2.2.zip`, 143 files.
+- SHA-256: `dce5d77a07513b4ba6c61f3a02f0f3e1272a36af394971d2f849e7e882dfb531`.
+- Exact packaged Factorio 2.0.77 base and expansion: 377 initial and 509 cumulative
+  checks each; all six phases exited zero with markers, no signals or forced kills.
+- Shutdown controller: seven tests passed. Resources: 78 files, 12 compiler modules,
+  64 guest files and 19 pinned-source patches.
+- Basic-editor single-character fixture: 12 scheduler ticks / 16384 instructions,
+  including eight collection ticks, versus 40 / 40960 in packaged 0.2.1. The new
+  advanced-editor text-echo fixture takes four ticks / 16384 instructions before
+  deferred syntax work. These are scheduler measurements, not client latency.
+- Both editors cache unchanged rows/status. Advanced syntax refresh is deferred
+  after a short typing pause; foreground highlighting is separately checked.
+- Direct Recrafted timers now register thread ownership. Filter precedence cannot
+  bypass ownership; consumed/cancelled routing entries are removed. Actual shell
+  timer polling and deferred editor highlighting coexist through save/reload.
+- Native text capture is visually hidden and terminal clicks restore focus.
+  Table-backed GUI checks cover click focus, character/paste routing, native
+  Backspace fallback/deduplication, bounded dirty-row refresh, foreground palette
+  updates and same-size display replacement. These are not native client tests.
+- Presentation runs every tick, prioritizes the cursor row and skips unchanged
+  rows. Per-computer instruction/collection quanta are 4096/2048; both aggregate
+  tick caps remain 4096. Shared-credit/reload/fairness regressions pass.
+- Save files and reboot each computer once after updating; compiled guest ROM
+  remains old until reboot. Unsaved buffers are not automatically discarded.
+
+Earlier source failures remain in scratch logs, including timer integration
+timeouts/forced cleanup and assumptions that every busy computer could consume
+its full quantum beside a neighbour. Corrected archive reruns pass; failed runs
+are not reclassified as passes. Graphical, clipboard/IME, multiplayer, hostile
+workload responsiveness and full specification acceptance remain provisional.

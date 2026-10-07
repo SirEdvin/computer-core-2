@@ -68,6 +68,16 @@ function rc.reboot()
 end
 
 local timer_filter = {}
+local start_timer, cancel_timer = rc.startTimer, rc.cancelTimer
+function rc.startTimer(seconds)
+  local id = start_timer(seconds)
+  timer_filter[id] = require("rc.thread").id()
+  return id
+end
+function rc.cancelTimer(id)
+  cancel_timer(id)
+  timer_filter[id] = nil
+end
 function rc.pullEventRaw(filter)
   expect(1, filter, "string", "nil")
 
@@ -76,8 +86,9 @@ function rc.pullEventRaw(filter)
     sig = table.pack(coroutine.yield())
   until ((sig[1] == "timer" and
     timer_filter[sig[2]] == require("rc.thread").id()) or sig[1] ~= "timer")
-    and (not filter) or (sig[1] == filter)
+    and (not filter or sig[1] == filter)
 
+  if sig[1] == "timer" then timer_filter[sig[2]] = nil end
   return table.unpack(sig, 1, sig.n)
 end
 
@@ -92,8 +103,9 @@ function rc.pullEvent(filter)
     end
   until ((sig[1] == "timer" and
     timer_filter[sig[2]] == require("rc.thread").id()) or sig[1] ~= "timer")
-    and (not filter) or (sig[1] == filter)
+    and (not filter or sig[1] == filter)
 
+  if sig[1] == "timer" then timer_filter[sig[2]] = nil end
   return table.unpack(sig, 1, sig.n)
 end
 
@@ -2022,6 +2034,7 @@ local type_colors = {
 
 local lines = {}
 local linesDraw = {}
+local highlighted_source = {}
 local run, menu = true, false
 local cx, cy = 1, 1
 local scroll = 0
@@ -2048,42 +2061,47 @@ if not lines[1] then lines[1] = "" end
 
 local win = require("window").create(term.current(), 1, 1, term.getSize())
 
+local drawn, drawn_status, drawn_w, drawn_h, drawn_scroll = {}, nil, nil, nil, nil
+local function same_line(a, b)
+  if a == b then return true end
+  if not a or not b or #a ~= #b then return false end
+  for i = 1, #a do if a[i] ~= b[i] then return false end end
+  return true
+end
 local function redraw()
   local w, h = term.getSize()
-
-  -- this seems to provide a good responsiveness curve on my machine
   scroll_increment = math.floor(h/scroll_factor)
-
-  win.reposition(1, 1, w, h)
-
-  win.setVisible(false)
-
+  if w ~= drawn_w or h ~= drawn_h then
+    win.reposition(1, 1, w, h)
+    drawn, drawn_status = {}, nil
+  elseif drawn_scroll ~= hscroll then drawn = {} end
+  drawn_w, drawn_h, drawn_scroll = w, h, hscroll
   for i=1, h - 1, 1 do
-    local line = linesDraw[i]
-    win.setCursorPos(1 - hscroll, i)
-    win.clearLine()
-    if line then
-      for t=1, #line, 1 do
-        local item = line[t]
-        if type(item) == "number" then
-          win.setTextColor(item)
-        else
-          win.write(item)
+    local line = linesDraw[i] or false
+    if not same_line(drawn[i], line) then
+      win.setCursorPos(1 - hscroll, i)
+      win.setTextColor(colors.white)
+      win.clearLine()
+      if line then
+        for t=1, #line, 1 do
+          local item = line[t]
+          if type(item) == "number" then win.setTextColor(item)
+          else win.write(item) end
         end
       end
+      drawn[i] = line
     end
   end
-
-  win.setCursorPos(1, h)
-  win.clearLine()
-  win.setTextColor(type_colors.accent or colors.yellow)
-  win.write(status)
+  if drawn_status ~= status then
+    win.setCursorPos(1, h)
+    win.clearLine()
+    win.setTextColor(type_colors.accent or colors.yellow)
+    win.write(status)
+    drawn_status = status
+  end
   win.setTextColor(colors.white)
-
   win.setCursorPos(math.min(w, cx), cy - scroll)
   win.setCursorBlink(true)
-
-  win.setVisible(true)
 end
 
 local syntax = require("edit.syntax")
@@ -2093,6 +2111,8 @@ local function rehighlight()
   local line = {}
   linesDraw = {}
   local _, h = term.getSize()
+  highlighted_source = {}
+  for i = 1, h - 1 do highlighted_source[i] = lines[scroll+i] or "" end
   local text = table.concat(lines, "\n", scroll+1,
     math.min(#lines, scroll+h+1)) or ""
   for token, ttype in syntax(text) do
@@ -2121,6 +2141,16 @@ local function rehighlight()
   end
 end
 
+-- Text echoes immediately. Syntax waits for a short idle period instead of
+-- running the guest pattern engine synchronously after every character.
+local highlight_timer
+local function delayed_highlight(event, id)
+  if event == "timer" and id == highlight_timer then
+    highlight_timer = nil
+    rehighlight()
+    return true
+  end
+end
 local function save()
   if file == ".new" then
     local _, h = term.getSize()
@@ -2146,6 +2176,7 @@ end
 
 local function processInput()
   local event, id = rc.pullEvent()
+  if delayed_highlight(event, id) then return end
 
   local w, h = term.getSize()
 
@@ -2287,6 +2318,7 @@ end
 
 local function processMenuInput()
   local event, id = rc.pullEvent()
+  if delayed_highlight(event, id) then return end
 
   if event == "char" then
     if id:lower() == "e" then
@@ -2316,8 +2348,24 @@ local function processMenuInput()
   end
 end
 
+local initialized = false
 while run do
-  if changed then rehighlight() changed = false end
+  if changed then
+    if not initialized then rehighlight(); initialized = true
+    else
+      local _, h = term.getSize()
+      for i = 1, h - 1 do
+        local text = lines[scroll+i] or ""
+        if highlighted_source[i] ~= text then
+          linesDraw[i] = text ~= "" and {colors.white, text} or false
+          highlighted_source[i] = text
+        end
+      end
+      if highlight_timer then rc.cancelTimer(highlight_timer) end
+      highlight_timer = rc.startTimer(0.2)
+    end
+    changed = false
+  end
   redraw()
   if menu then
     processMenuInput()
@@ -2325,6 +2373,7 @@ while run do
     processInput()
   end
 end
+if highlight_timer then rc.cancelTimer(highlight_timer) end
 ]=],
 ["/rc/editors/basic.lua"] = [=[
 -- editor
@@ -2370,20 +2419,29 @@ if args[1] then
   end
 end
 
+local drawn, drawn_status, drawn_w, drawn_h = {}, nil, nil, nil
 local function redraw()
   local w, h = term.getSize()
+  if w ~= drawn_w or h ~= drawn_h then drawn, drawn_status = {}, nil end
+  drawn_w, drawn_h = w, h
 
   for i=1, h - 1, 1 do
     local to_write = state.lines[state.scroll + i] or ""
     if state.cx > w then
       to_write = to_write:sub(state.cx - (w-1))
     end
-    term.at(1, i).clearLine()
-    term.write(to_write)
+    if drawn[i] ~= to_write then
+      term.at(1, i).clearLine()
+      term.write(to_write)
+      drawn[i] = to_write
+    end
   end
 
-  term.at(1, h).clearLine()
-  textutils.coloredWrite(colors.yellow, state.status, colors.white)
+  if drawn_status ~= state.status then
+    term.at(1, h).clearLine()
+    textutils.coloredWrite(colors.yellow, state.status, colors.white)
+    drawn_status = state.status
+  end
 
   term.setCursorPos(math.min(w, state.cx), state.cy - state.scroll)
 end
@@ -3119,7 +3177,8 @@ local syntenv = {
       end,
       function(tk)
         return tk == str
-      end
+      end,
+      literal = str
     }
   end,
   print = print,
@@ -3131,16 +3190,12 @@ local syntenv = {
 
 -- basic ""reader""
 local function reader(text)
-  local chars = {}
-  for c in text:gmatch(".") do
-    chars[#chars+1] = c
-  end
 
   local i = 0
   return {
     advance = function()
       i = i + 1
-      return chars[i]
+      if i <= #text then return text:sub(i, i) end
     end,
     backpedal = function()
       i = math.max(0, i - 1)
@@ -3160,6 +3215,33 @@ function lib.new(file)
     end
   end
 
+  -- Preserve rule order/ties while excluding impossible literal first bytes.
+  local generic, literals, candidates, rank = {}, {}, {}, 0
+  for class, defs in pairs(definitions) do
+    for _, funcs in pairs(defs) do
+      rank = rank + 1
+      local first = type(funcs.literal) == "string" and funcs.literal:sub(1, 1) or nil
+      local entry = {class = class, funcs = funcs, first = first, rank = rank}
+      local list = generic
+      if first then
+        if not literals[first] then literals[first] = {} end
+        list = literals[first]
+      end
+      list[#list+1] = entry
+    end
+  end
+  local function starting(c)
+    if not candidates[c] then
+      local list, specific, i, j = {}, literals[c] or {}, 1, 1
+      while i <= #generic or j <= #specific do
+        if generic[i] and (not specific[j] or generic[i].rank < specific[j].rank) then
+          list[#list+1] = generic[i]; i = i + 1
+        else list[#list+1] = specific[j]; j = j + 1 end
+      end
+      candidates[c] = list
+    end
+    return candidates[c]
+  end
   return function(text)
     local read = reader(text)
     local possibilities = {}
@@ -3231,16 +3313,15 @@ function lib.new(file)
 
         if #possibilities == 0 then
           -- if no current possibilities, then go through and check for them
-          for class, defs in pairs(definitions) do
-            for _, funcs in pairs(defs) do
-              if funcs[1](c) then
+          for _, entry in ipairs(starting(c)) do
+              local funcs = entry.funcs
+              if entry.first or funcs[1](c) then
                 -- if the token is valid, add it here
                 possibilities[#possibilities+1] = {
-                  check = funcs[2], class = class, token = c,
+                  check = funcs[2], class = entry.class, token = c,
                   valid = funcs[3] or function()return true end, active = true
                 }
               end
-            end
           end
 
           -- if there are now some possibilities, return whatever the "aux"

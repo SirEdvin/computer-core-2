@@ -1,4 +1,4 @@
-# Known limitations — 0.2.1 alpha
+# Known limitations — 0.2.2 alpha
 
 This is an experimental, breaking terminal-OS playtest, **not full CraftOS** and
 not a stable release. This document does not certify completed source integration,
@@ -24,12 +24,15 @@ Follow [PLAYTEST.md](PLAYTEST.md) on a fresh world or backed-up save copy.
 
 ## Input, presentation and shared sessions
 
-- Text/paste enters through the focused capture field below the terminal. Enter
+- Clicking the terminal focuses a visually hidden native capture widget. Enter
   uses GUI confirmation; navigation uses custom inputs. The fallback button row
   is removed. Ctrl+M opens the upstream editor menu. Physical
   key release/held state and mouse drag are not captured: each key/cell click is
   followed by a synthetic release. Hold/repeat and shortcut interception remain
   client-unverified; custom inputs deliberately do not consume world controls.
+- Advanced-editor changed rows echo in plain text first. Syntax colors refresh
+  after a short typing pause; expensive highlighting can still delay later input.
+  Hidden-widget focus, deletion, clipboard behavior and real latency need client testing.
 - Single-byte input is a `char`; multi-byte updates are a `paste` (a heuristic,
   not clipboard detection). The byte-cell renderer shows printable ASCII and
   `?` for other bytes, without modifying stored source/file bytes. It uses a
@@ -53,10 +56,10 @@ Follow [PLAYTEST.md](PLAYTEST.md) on a fresh world or backed-up save copy.
 
 ## Resource and upgrade caveats
 
-- Updating from 0.2.0 does not replace already-compiled guest modules or discard
+- Updating from 0.2.0/0.2.1 does not replace already-compiled guest modules or discard
   suspended editor drafts. Save files and reboot each computer once to load the
-  optimized window code. Reboot discards unsaved buffers, not saved files.
-- Per-computer instruction and collection quanta are now 1024 rather than 256;
+  optimized OS code. Reboot discards unsaved buffers, not saved files.
+- Per-computer instruction and collection quanta are now 4096 and 2048;
   their aggregate tick caps remain 4096. A few computers get faster service;
   many continuously busy computers still share those same aggregate caps.
 

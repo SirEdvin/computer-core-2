@@ -31,6 +31,7 @@ local function pump(vm, predicate)
   local scheduler = Scheduler.new()
   Scheduler.add(scheduler, 1, vm)
   for turns = 1, 40000 do
+
     local co = vm.current and vm.objects[vm.current]
     local frame = co and co.frames[#co.frames]
     local source = frame and frame.proto and frame.proto.source or '?'
@@ -42,7 +43,7 @@ local function pump(vm, predicate)
     end
     -- The parent shell polls timers while its forked editor is alive, so the
     -- root need not wait. Verify the actual editor coroutine's suspension.
-    if (vm.wait or editor_waiting(vm)) and predicate() then report(turns); return turns, vm.instructions - instructions end
+    if (vm.wait or editor_waiting(vm)) and predicate() then report(turns); return turns, vm.instructions - instructions, collection_ticks end
   end
   report(40000)
   for i, row in ipairs(vm.display.lines) do log('CC2 EDITOR FAILURE ROW ' .. i .. ' ' .. row.text) end
@@ -86,9 +87,9 @@ function M.initial(vm, check)
   pump(vm, function() return footer(vm, 'Press Control for menu') end)
   check('actual basic editor starts through upstream shell', true)
   type_text(vm, 'b')
-  local turns, instructions = pump(vm, function() return vm.display.lines[1].text:sub(1, 1) == 'b' end)
-  check('basic editor typing avoids nested full-window redraw amplification', instructions <= vm.display.rows * 4096
-    and turns <= math.ceil(vm.display.rows * 4096 / 1024) + 1)
+  local turns, instructions, collecting = pump(vm, function() return vm.display.lines[1].text:sub(1, 1) == 'b' end)
+  check('basic editor typing redraws changed rows rather than the whole screen', instructions <= vm.display.rows * 1024
+    and turns - collecting <= math.ceil(vm.display.rows * 1024 / 4096) + 1)
   send(vm, 'key', 263, false)
   send(vm, 'paste', 'xy\r\nz\n')
   send(vm, 'char', '!')
@@ -100,8 +101,11 @@ function M.initial(vm, check)
   command(vm, 'edit /edited.lua')
   pump(vm, function() return footer(vm, 'Press Ctrl for menu') end)
   check('actual advanced editor starts through upstream edit command', true)
-  send(vm, 'paste', 'print(7)')
-  pump(vm, function() return vm.display.lines[1].text:sub(1, 8) == 'print(7)' end)
+  send(vm, 'char', 'p')
+  local typed_turns,typed_instructions,typed_collecting=pump(vm,function() return vm.display.lines[1].text:sub(1,1)=='p' end)
+  check('advanced editor echoes a character before deferred syntax work',typed_instructions<=32768 and typed_turns-typed_collecting<=9)
+  send(vm, 'paste', 'rint(7)')
+  pump(vm, function() return vm.display.lines[1].text:sub(1, 8) == 'print(7)' and vm.display.lines[1].foreground:sub(1, 5) == '55555' end)
   check('actual advanced editor highlights builtin and number cells', vm.display.lines[1].foreground:sub(1, 5) == '55555' and vm.display.lines[1].foreground:sub(7, 7) == '2')
   check('dirty advanced editor does not write its draft to disk', vm.disk.fs['/edited.lua'] == nil)
 end

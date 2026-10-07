@@ -35,6 +35,7 @@ local unwind_checks = require("unwind_checks")
 local frame_cleanup_checks = require("frame_cleanup_checks")
 local live_disk_checks = require("live_disk_checks")
 local terminal_input_checks = require("terminal_input_checks")
+local terminal_presentation_checks = require("terminal_presentation_checks")
 local loaded = false
 local load_checked = false
 local function check(name, condition)
@@ -78,6 +79,7 @@ script.on_init(function()
   live_disk_checks.initial(check)
   terminal_checks(check)
   terminal_input_checks(check)
+  terminal_presentation_checks(check)
   storage.resize_execution = resize_checks.initial(check)
   for _, fixture in ipairs(fixtures) do
     local proto, err = Compiler.compile(fixture.source, fixture.path)
@@ -255,8 +257,13 @@ script.on_init(function()
   local pattern_neighbor = VM.new(assert(Compiler.compile([[return 'pattern-neighbor-pass']])))
   Scheduler.add(pattern_scheduler, 1, stuck_pattern)
   Scheduler.add(pattern_scheduler, 2, pattern_neighbor)
-  for _ = 1, 16 do Scheduler.tick(pattern_scheduler) end
-  check("adversarial pattern remains within guest instruction quanta", stuck_pattern.instructions == 16 * Limits.instructions_per_computer and stuck_pattern.objects[stuck_pattern.main.ref].status == "running")
+  local pattern_work = 0
+  for _ = 1, 16 do pattern_work = pattern_work + Scheduler.tick(pattern_scheduler) end
+  check("adversarial pattern remains within guest instruction quanta", stuck_pattern.instructions > 0
+    and stuck_pattern.instructions <= 16 * Limits.instructions_per_computer
+    and pattern_work <= 16 * Limits.instructions_per_tick
+    and stuck_pattern.instructions + pattern_neighbor.instructions == pattern_work
+    and stuck_pattern.objects[stuck_pattern.main.ref].status == "running")
   check("pattern backtracking does not block another computer", pattern_neighbor.objects[pattern_neighbor.main.ref].status == "dead" and pattern_neighbor.objects[pattern_neighbor.main.ref].result[1] == "pattern-neighbor-pass")
   storage.sort_execution = VM.new(assert(Compiler.compile([[local values = {8, 3, 7, 1, 6, 2, 5, 4}
     local waiting = false
@@ -276,8 +283,13 @@ script.on_init(function()
   local neighbor = VM.new(assert(Compiler.compile([[return 'sort-neighbor-pass']])))
   Scheduler.add(sort_scheduler, 1, stuck_sort)
   Scheduler.add(sort_scheduler, 2, neighbor)
-  for _ = 1, 4 do Scheduler.tick(sort_scheduler) end
-  check("infinite sort comparison respects guest quanta", stuck_sort.instructions == 4 * Limits.instructions_per_computer and stuck_sort.objects[stuck_sort.main.ref].status == "running")
+  local sort_work = 0
+  for _ = 1, 4 do sort_work = sort_work + Scheduler.tick(sort_scheduler) end
+  check("infinite sort comparison respects guest quanta", stuck_sort.instructions > 0
+    and stuck_sort.instructions <= 4 * Limits.instructions_per_computer
+    and sort_work <= 4 * Limits.instructions_per_tick
+    and stuck_sort.instructions + neighbor.instructions == sort_work
+    and stuck_sort.objects[stuck_sort.main.ref].status == "running")
   check("sort exhaustion does not block another computer", neighbor.objects[neighbor.main.ref].status == "dead" and neighbor.objects[neighbor.main.ref].result[1] == "sort-neighbor-pass")
   storage.event_execution = VM.new(assert(Compiler.compile([[local preserved = {value = 9}
     local handle = assert(io.open('/resume.txt', 'w+'))

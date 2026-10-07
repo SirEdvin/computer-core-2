@@ -5,6 +5,10 @@ styles.cc2_output = {type = 'textbox_style', parent = 'cc2_code'}
 styles.cc2_status = {type = 'label_style', parent = 'label', single_line = false}
 data:extend{{type='font',name='cc2_terminal_mono',from='default-mono',size=14}}
 styles.cc2_terminal_grid = {type='table_style',parent='table',horizontal_spacing=0,vertical_spacing=0}
+-- Keep native text entry focusable, without a separate visible input box.
+styles.cc2_terminal_capture = {type='textbox_style',parent='textbox',width=1,height=1,
+  minimal_width=0,minimal_height=0,padding=0,margin=0,font_color={r=0,g=0,b=0,a=0},
+  selection_background_color={r=0,g=0,b=0,a=0},default_background={},active_background={},disabled_background={}}
 for i,value in ipairs(require('scripts.terminal_palette')) do
   local color={r=math.floor(value/65536)/255,g=math.floor(value/256)%256/255,b=value%256/255}
   local background={base={type='composition',center={filename='__computer_core_2__/graphics/terminal-cell.png',width=1,height=1},tint=color}}

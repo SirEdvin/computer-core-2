@@ -27,7 +27,8 @@ local syntenv = {
       end,
       function(tk)
         return tk == str
-      end
+      end,
+      literal = str
     }
   end,
   print = print,
@@ -39,16 +40,12 @@ local syntenv = {
 
 -- basic ""reader""
 local function reader(text)
-  local chars = {}
-  for c in text:gmatch(".") do
-    chars[#chars+1] = c
-  end
 
   local i = 0
   return {
     advance = function()
       i = i + 1
-      return chars[i]
+      if i <= #text then return text:sub(i, i) end
     end,
     backpedal = function()
       i = math.max(0, i - 1)
@@ -68,6 +65,33 @@ function lib.new(file)
     end
   end
 
+  -- Preserve rule order/ties while excluding impossible literal first bytes.
+  local generic, literals, candidates, rank = {}, {}, {}, 0
+  for class, defs in pairs(definitions) do
+    for _, funcs in pairs(defs) do
+      rank = rank + 1
+      local first = type(funcs.literal) == "string" and funcs.literal:sub(1, 1) or nil
+      local entry = {class = class, funcs = funcs, first = first, rank = rank}
+      local list = generic
+      if first then
+        if not literals[first] then literals[first] = {} end
+        list = literals[first]
+      end
+      list[#list+1] = entry
+    end
+  end
+  local function starting(c)
+    if not candidates[c] then
+      local list, specific, i, j = {}, literals[c] or {}, 1, 1
+      while i <= #generic or j <= #specific do
+        if generic[i] and (not specific[j] or generic[i].rank < specific[j].rank) then
+          list[#list+1] = generic[i]; i = i + 1
+        else list[#list+1] = specific[j]; j = j + 1 end
+      end
+      candidates[c] = list
+    end
+    return candidates[c]
+  end
   return function(text)
     local read = reader(text)
     local possibilities = {}
@@ -139,16 +163,15 @@ function lib.new(file)
 
         if #possibilities == 0 then
           -- if no current possibilities, then go through and check for them
-          for class, defs in pairs(definitions) do
-            for _, funcs in pairs(defs) do
-              if funcs[1](c) then
+          for _, entry in ipairs(starting(c)) do
+              local funcs = entry.funcs
+              if entry.first or funcs[1](c) then
                 -- if the token is valid, add it here
                 possibilities[#possibilities+1] = {
-                  check = funcs[2], class = class, token = c,
+                  check = funcs[2], class = entry.class, token = c,
                   valid = funcs[3] or function()return true end, active = true
                 }
               end
-            end
           end
 
           -- if there are now some possibilities, return whatever the "aux"

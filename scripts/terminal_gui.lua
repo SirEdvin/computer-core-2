@@ -6,6 +6,14 @@ local R = require('scripts.os_runtime')
 local Palette = require('scripts.terminal_palette')
 local M = {}
 local cache = {} -- Ephemeral rendering cache. Never an execution/persistence root.
+local capture_marker='\226\128\139' -- Selected zero-width marker makes native Backspace observable.
+local function focus_capture(frame,session)
+  session.capture_marker_retained=false
+  local input=frame.cc2_capture
+  input.text=capture_marker
+  input.focus()
+  input.select_all()
+end
 local function rgb(value)
   return {r=math.floor(value/65536)/255,g=math.floor(value/256)%256/255,b=value%256/255}
 end
@@ -44,7 +52,7 @@ end
 local function status(frame,c,session)
   local text=c.os_error or (not R.powered(c) and 'No power' or c.os_stopped and 'Stopped — Reboot to start' or c.guest and 'Running' or 'Booting…')
   if session.notice then text=session.notice end
-  if frame then frame.cc2_status.caption=text end
+  if frame and frame.cc2_status.caption~=text then frame.cc2_status.caption=text end
 end
 local function send(player,c,session,...)
   local ok,err=R.event(c,table.pack(...))
@@ -62,8 +70,7 @@ function M.render(player)
   if not display then return end
   local blink=display.blink and math.floor(game.tick/30)%2==0
   local view=cache[player.index]
-  if view and view.source==display and view.revision==display.revision and view.blink==blink then return end
-  if view and view.source~=display then view.revision=nil; view.sweep_revision=nil end
+  if view and view.source==display and not view.pending and view.revision==display.revision and view.blink==blink then return end
   local pane=frame.cc2_scroll
   local grid=pane.cc2_cells
   if not grid or grid.column_count~=display.columns or #grid.children~=display.columns*display.rows then
@@ -74,38 +81,59 @@ function M.render(player)
         grid.add{type='button',caption=' ',style='cc2_terminal_bg_15',tags={cc2_cell=true,x=x,y=y}}
       end
     end
-    cache[player.index]={cells={},cursor=1}
+    cache[player.index]={cells={},rows={},next_row=1}
   end
   view=cache[player.index]
-  if not view then view={cells={},cursor=1}; cache[player.index]=view end
+  if not view then view={cells={},rows={},next_row=1}; cache[player.index]=view end
+  if view.source~=display then view.rows={} end
   view.source=display
   local children=grid.children
-  -- A bounded refresh sweep avoids repainting a maximum-size grid every tick.
-  for _=1,math.min(512,#children) do
-    local i=view.cursor
-    if i==1 then view.sweep_revision=display.revision; view.sweep_blink=blink end
-    local x=(i-1)%display.columns+1
-    local y=math.floor((i-1)/display.columns)+1
+  local palette={}
+  for i,color in ipairs(display.palette) do palette[i]=color.r..':'..color.g..':'..color.b end
+  local palette_key=table.concat(palette,';')
+  local remaining=512
+  local function row(y)
+    if y<1 or y>display.rows then return true end
     local line=display.lines[y]
-    local byte=line.text:byte(x)
-    local glyph=byte>=32 and byte<=126 and string.char(byte) or byte==32 and ' ' or '?'
-    local fg=tonumber(line.foreground:sub(x,x),16)+1
-    local bg=tonumber(line.background:sub(x,x),16)+1
-    if blink and x==display.x and y==display.y then fg,bg=bg,fg; if glyph==' ' then glyph='_' end end
-    local color=display.palette[fg]
-    local signature=glyph..':'..bg..':'..color.r..':'..color.g..':'..color.b
-    if view.cells[i]~=signature then
-      local cell=children[i]
-      cell.style='cc2_terminal_bg_'..(bg-1)
-      cell.caption=glyph
-      cell.style.font_color=color
-      cell.style.hovered_font_color=color
-      cell.style.clicked_font_color=color
-      view.cells[i]=signature
+    local cursor=blink and y==display.y and display.x or 0
+    local old=view.rows[y]
+    if old and old.text==line.text and old.fg==line.foreground and old.bg==line.background
+      and old.palette==palette_key and old.cursor==cursor then return true end
+    if remaining<display.columns then return false end
+    remaining=remaining-display.columns
+    for x=1,display.columns do
+      local i=(y-1)*display.columns+x
+      local byte=line.text:byte(x)
+      local glyph=byte>=32 and byte<=126 and string.char(byte) or '?'
+      local fg=tonumber(line.foreground:sub(x,x),16)+1
+      local bg=tonumber(line.background:sub(x,x),16)+1
+      if x==cursor then fg,bg=bg,fg; if glyph==' ' then glyph='_' end end
+      local color=display.palette[fg]
+      local signature=glyph..':'..bg..':'..palette[fg]
+      if view.cells[i]~=signature then
+        local cell=children[i]
+        cell.style='cc2_terminal_bg_'..(bg-1)
+        cell.caption=glyph
+        cell.style.font_color=color
+        cell.style.hovered_font_color=color
+        cell.style.clicked_font_color=color
+        view.cells[i]=signature
+      end
     end
-    view.cursor=i%#children+1
-    if view.cursor==1 then view.revision=view.sweep_revision; view.blink=view.sweep_blink end
+    view.rows[y]={text=line.text,fg=line.foreground,bg=line.background,palette=palette_key,cursor=cursor}
+    return true
   end
+  -- Cursor echo first; rotate remaining dirty rows without exceeding 512 cells.
+  row(display.y)
+  if view.cursor_y and view.cursor_y~=display.y then row(view.cursor_y) end
+  view.pending=false
+  local first=view.next_row
+  for offset=0,display.rows-1 do
+    local y=(first+offset-1)%display.rows+1
+    if not row(y) then view.pending=true; view.next_row=y; break end
+  end
+  view.cursor_y=display.y
+  view.revision,view.blink=display.revision,blink
 end
 function M.open(player,c)
   if not M.authorized(player,c) then return false end
@@ -118,7 +146,7 @@ function M.open(player,c)
   bar.add{type='button',name='cc2_shutdown',caption='Shutdown',tooltip='Pause this computer until Reboot. Closing the window does not stop it.'}
   bar.add{type='button',name='cc2_terminate',caption='Terminate',tooltip='Send termination to the guest program.'}
   bar.add{type='button',name='cc2_close',caption='Close'}
-  frame.add{type='label',name='cc2_status',caption='Booting…',style='cc2_status'}
+  frame.add{type='label',name='cc2_status',caption='Booting…',style='cc2_status',tooltip='Click the terminal to type or paste. Enter submits; Ctrl+M opens the editor menu.'}
   if c.migration_notice then
     frame.add{type='label',caption='Alpha upgrade: old callbacks retired. Files/drafts retained; see /legacy-recovery and /legacy-startup*. Back up your save.',style='cc2_status'}.style.maximal_width=600
   end
@@ -126,13 +154,11 @@ function M.open(player,c)
   local scale=player.display_scale or 1
   pane.style.maximal_width=math.max(160,math.floor(player.display_resolution.width/scale)-100)
   pane.style.maximal_height=math.max(120,math.floor(player.display_resolution.height/scale)-260)
-  local input=frame.add{type='textfield',name='cc2_capture',text='',lose_focus_on_confirm=false,
-    tooltip='Type/paste here to send terminal text immediately. Enter submits. Ctrl+M opens the editor menu. Navigation uses keyboard shortcuts.'}
-  input.style.horizontally_stretchable=true
+  frame.add{type='textfield',name='cc2_capture',text=capture_marker,style='cc2_terminal_capture',lose_focus_on_confirm=false}
 
   player.opened=frame
   M.render(player)
-  input.focus()
+  focus_capture(frame,storage.sessions[player.index])
   return true
 end
 function M.gauntlet(player)
@@ -161,6 +187,8 @@ function M.key(event,code)
   -- CustomInputEvent.element/in_gui describe mouse hover, not keyboard focus.
   -- The opened terminal and current authorization determine keyboard routing.
   tap(player,c,session,code)
+  if code>=262 and code<=269 then session.capture_marker_retained=true end
+  if code==259 or code==261 then session.capture_key_tick=game.tick end
 end
 function M.event(event)
   local player=game.get_player(event.player_index)
@@ -171,8 +199,12 @@ function M.event(event)
   local tags=element.tags
   if event.name==defines.events.on_gui_text_changed and element.name=='cc2_capture' then
     local text=element.text
-    if #text>0 then
-      if send(player,c,session,#text==1 and 'char' or 'paste',text) then element.text='' end
+    if text=='' then
+      if session.capture_key_tick~=game.tick then tap(player,c,session,259) end
+      focus_capture(frame,session)
+    elseif text~=capture_marker then
+      if session.capture_marker_retained then text=text:gsub(capture_marker,'',1) end
+      if #text>0 and send(player,c,session,#text==1 and 'char' or 'paste',text) then focus_capture(frame,session) end
     end
   elseif event.name==defines.events.on_gui_confirmed and element.name=='cc2_capture' then
     tap(player,c,session,257)
@@ -186,7 +218,7 @@ function M.event(event)
       local button=event.button==defines.mouse_button_type.right and 2 or event.button==defines.mouse_button_type.middle and 3 or 1
       if send(player,c,session,'mouse_click',button,tags.x,tags.y) then send(player,c,session,'mouse_up',button,tags.x,tags.y) end
     end
-    if frame.valid then frame.cc2_capture.focus() end
+    if frame.valid then focus_capture(frame,session) end
   end
   M.render(player)
 end

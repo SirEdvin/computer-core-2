@@ -1,4 +1,4 @@
-# Computer Core 2 — experimental 0.2.1 alpha
+# Computer Core 2 — experimental 0.2.2 alpha
 
 A terminal-only Lua computer for Factorio 2.0.77+, using a pinned Recrafted BIOS,
 shell and editors inside a durable guest VM. Existing world artwork is retained.
@@ -10,12 +10,12 @@ are still unverified and belong to the playtester.**
 
 ## Install and use
 
-1. Copy the supplied `computer_core_2_0.2.1.zip` into Factorio's `mods` directory.
+1. Copy the supplied `computer_core_2_0.2.2.zip` into Factorio's `mods` directory.
    Do not enable the original `computer_core` simultaneously.
 2. Research Personal Computer, then Computer. Supply power to a placed computer.
 3. Stay within ten tiles and Ctrl+left-click its body, or Ctrl+G for the private
    personal gauntlet (requires research and a character).
-4. Click the capture field below the grid. Text/paste sends immediately; Enter
+4. Click the terminal itself to type or paste. Native capture is visually hidden; Enter
    submits. Use keyboard shortcuts for navigation; the fallback button row is removed.
 5. Type `edit /hello.lua`. Enter `print("Hello")`; Ctrl+M opens
    the editor menu, then type **s** to save or **e** to exit. Run `/hello.lua`.

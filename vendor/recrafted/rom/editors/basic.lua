@@ -41,20 +41,29 @@ if args[1] then
   end
 end
 
+local drawn, drawn_status, drawn_w, drawn_h = {}, nil, nil, nil
 local function redraw()
   local w, h = term.getSize()
+  if w ~= drawn_w or h ~= drawn_h then drawn, drawn_status = {}, nil end
+  drawn_w, drawn_h = w, h
 
   for i=1, h - 1, 1 do
     local to_write = state.lines[state.scroll + i] or ""
     if state.cx > w then
       to_write = to_write:sub(state.cx - (w-1))
     end
-    term.at(1, i).clearLine()
-    term.write(to_write)
+    if drawn[i] ~= to_write then
+      term.at(1, i).clearLine()
+      term.write(to_write)
+      drawn[i] = to_write
+    end
   end
 
-  term.at(1, h).clearLine()
-  textutils.coloredWrite(colors.yellow, state.status, colors.white)
+  if drawn_status ~= state.status then
+    term.at(1, h).clearLine()
+    textutils.coloredWrite(colors.yellow, state.status, colors.white)
+    drawn_status = state.status
+  end
 
   term.setCursorPos(math.min(w, state.cx), state.cy - state.scroll)
 end

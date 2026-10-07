@@ -107,12 +107,14 @@ function methods.getSize(display) return display.columns, display.rows end
 function methods.getCursorPos(display) return display.x, display.y end
 function methods.setCursorPos(display, x, y)
   x, y = integer(x), integer(y)
+  if display.x == x and display.y == y then return end
   display.x, display.y = x, y
   display.revision = display.revision + 1
 end
 function methods.getCursorBlink(display) return display.blink end
 function methods.setCursorBlink(display, blink)
   assert(type(blink) == "boolean", "expected blink boolean")
+  if display.blink == blink then return end
   display.blink = blink
   display.revision = display.revision + 1
 end
@@ -148,6 +150,8 @@ function methods.setPaletteColor(display, mask, r, g, b)
     for _, value in ipairs({r, g, b}) do assert(type(value) == "number" and value >= 0 and value <= 1, "invalid RGB channel") end
     assert(type(r) == "number" and type(g) == "number" and type(b) == "number", "expected three RGB channels")
   end
+  local previous = display.palette[index]
+  if previous.r == r and previous.g == g and previous.b == b then return end
   display.palette[index] = {r = r, g = g, b = b}
   dirty(display)
 end

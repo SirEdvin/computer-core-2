@@ -65,6 +65,16 @@ function rc.reboot()
 end
 
 local timer_filter = {}
+local start_timer, cancel_timer = rc.startTimer, rc.cancelTimer
+function rc.startTimer(seconds)
+  local id = start_timer(seconds)
+  timer_filter[id] = require("rc.thread").id()
+  return id
+end
+function rc.cancelTimer(id)
+  cancel_timer(id)
+  timer_filter[id] = nil
+end
 function rc.pullEventRaw(filter)
   expect(1, filter, "string", "nil")
 
@@ -73,8 +83,9 @@ function rc.pullEventRaw(filter)
     sig = table.pack(coroutine.yield())
   until ((sig[1] == "timer" and
     timer_filter[sig[2]] == require("rc.thread").id()) or sig[1] ~= "timer")
-    and (not filter) or (sig[1] == filter)
+    and (not filter or sig[1] == filter)
 
+  if sig[1] == "timer" then timer_filter[sig[2]] = nil end
   return table.unpack(sig, 1, sig.n)
 end
 
@@ -89,8 +100,9 @@ function rc.pullEvent(filter)
     end
   until ((sig[1] == "timer" and
     timer_filter[sig[2]] == require("rc.thread").id()) or sig[1] ~= "timer")
-    and (not filter) or (sig[1] == filter)
+    and (not filter or sig[1] == filter)
 
+  if sig[1] == "timer" then timer_filter[sig[2]] = nil end
   return table.unpack(sig, 1, sig.n)
 end
 
