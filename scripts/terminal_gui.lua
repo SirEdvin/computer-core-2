@@ -158,8 +158,8 @@ function M.key(event,code)
   if not player then return end
   local c,session,frame=current(player)
   if not c or not frame or player.opened~=frame then return end
-  if event.element and not owns(frame,event.element) then return end
-  if not event.in_gui then return end
+  -- CustomInputEvent.element/in_gui describe mouse hover, not keyboard focus.
+  -- The opened terminal and current authorization determine keyboard routing.
   tap(player,c,session,code)
 end
 function M.event(event)

@@ -34,6 +34,7 @@ local continuation_budget_checks = require("continuation_budget_checks")
 local unwind_checks = require("unwind_checks")
 local frame_cleanup_checks = require("frame_cleanup_checks")
 local live_disk_checks = require("live_disk_checks")
+local terminal_input_checks = require("terminal_input_checks")
 local loaded = false
 local load_checked = false
 local function check(name, condition)
@@ -76,6 +77,7 @@ script.on_init(function()
   frame_cleanup_checks.initial(check)
   live_disk_checks.initial(check)
   terminal_checks(check)
+  terminal_input_checks(check)
   storage.resize_execution = resize_checks.initial(check)
   for _, fixture in ipairs(fixtures) do
     local proto, err = Compiler.compile(fixture.source, fixture.path)
