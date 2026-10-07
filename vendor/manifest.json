@@ -316,11 +316,12 @@
       "revision": "720773ec68239504cb134cd4f9b7e8bb66a1408e",
       "source_url": "https://github.com/Ocawesome101/recrafted/blob/720773ec68239504cb134cd4f9b7e8bb66a1408e/data/computercraft/lua/rom/apis/shell.lua",
       "source_sha256": "c4407dce42be0ea40a604fb3e4caac856569ec9e1f08c289e552c061e2f9dcc7",
-      "sha256": "c4407dce42be0ea40a604fb3e4caac856569ec9e1f08c289e552c061e2f9dcc7",
+      "sha256": "c633cf89a2371fc795f953d9addda8f19cd4ebe4e6cf149f24c3bfff6d45b669",
       "license": "MIT",
       "copyright": "Copyright (c) 2022 Ocawesome101",
       "license_path": "vendor/recrafted/LICENSE",
-      "guest_path": "/rc/apis/shell.lua"
+      "guest_path": "/rc/apis/shell.lua",
+      "patch": "vendor/patches/21-recrafted-shell-program-suffix.patch"
     },
     {
       "path": "vendor/recrafted/rom/apis/textutils.lua",
@@ -633,11 +634,12 @@
       "revision": "720773ec68239504cb134cd4f9b7e8bb66a1408e",
       "source_url": "https://github.com/Ocawesome101/recrafted/blob/720773ec68239504cb134cd4f9b7e8bb66a1408e/data/computercraft/lua/rom/modules/main/cc/shell/completion.lua",
       "source_sha256": "b3cf8ecd20b5de0353823c3fe158790e0244e99b63707efd15aea474cee02805",
-      "sha256": "b3cf8ecd20b5de0353823c3fe158790e0244e99b63707efd15aea474cee02805",
+      "sha256": "60d5c882c902e765ec1c607f22a986574adc28fcb09afc44f36003e10d62ea5c",
       "license": "MIT",
       "copyright": "Copyright (c) 2022 Ocawesome101",
       "license_path": "vendor/recrafted/LICENSE",
-      "guest_path": "/rc/modules/main/cc/shell/completion.lua"
+      "guest_path": "/rc/modules/main/cc/shell/completion.lua",
+      "patch": "vendor/patches/22-recrafted-completion-filter.patch"
     },
     {
       "path": "vendor/recrafted/rom/modules/main/cc/strings.lua",
@@ -999,7 +1001,7 @@
       "revision": "720773ec68239504cb134cd4f9b7e8bb66a1408e",
       "source_url": "https://github.com/Ocawesome101/recrafted/blob/720773ec68239504cb134cd4f9b7e8bb66a1408e/data/computercraft/lua/rom/startup/15_term.lua",
       "source_sha256": "836078c089f8f6fd7a8545b10d617f741d70e417ecca685413e51c071dedb87c",
-      "sha256": "6eaaf6dba36050cd925f627cc1b0d25e7496837ba8cc4971fcedf8f340d36b46",
+      "sha256": "9c32d163350b4ec6189a811bede3b5780b02479fca48975b691cdca1a6568484",
       "license": "MIT",
       "copyright": "Copyright (c) 2022 Ocawesome101",
       "license_path": "vendor/recrafted/LICENSE",
@@ -1128,6 +1130,16 @@
       "path": "vendor/patches/20-recrafted-timer-ownership.patch",
       "target": "vendor/recrafted/bios.lua",
       "reason": "Register direct timer ownership, enforce ownership together with event filters, and remove consumed/cancelled routing entries"
+    },
+    {
+      "path": "vendor/patches/21-recrafted-shell-program-suffix.patch",
+      "target": "vendor/recrafted/rom/apis/shell.lua",
+      "reason": "Use lexical suffix checks instead of guest patterns during interactive program completion"
+    },
+    {
+      "path": "vendor/patches/22-recrafted-completion-filter.patch",
+      "target": "vendor/recrafted/rom/modules/main/cc/shell/completion.lua",
+      "reason": "Filter nonmatching programs before guest sorting for interactive completion"
     }
   ],
   "excluded": [

@@ -51,9 +51,17 @@ function c.program(text, add_space)
     seen[full] = true
   end
 
-  table.sort(progs, function(a,b) return #a < #b end)
+  -- Nonmatching programs cannot contribute a suffix. Filter before sorting so
+  -- each key does not sort the entire executable list in guest bytecode.
+  local matching = {}
+  for i=1, #progs, 1 do
+    if progs[i]:sub(1, #text) == text then
+      matching[#matching+1] = progs[i]
+    end
+  end
+  table.sort(matching, function(a,b) return #a < #b end)
 
-  return completion.choice(text, progs, add_space)
+  return completion.choice(text, matching, add_space)
 end
 
 function c.programWithArgs(text, previous, starting)

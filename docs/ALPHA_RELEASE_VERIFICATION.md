@@ -104,3 +104,32 @@ timeouts/forced cleanup and assumptions that every busy computer could consume
 its full quantum beside a neighbour. Corrected archive reruns pass; failed runs
 are not reclassified as passes. Graphical, clipboard/IME, multiplayer, hostile
 workload responsiveness and full specification acceptance remain provisional.
+
+## 0.2.3 interactive shell completion and typing-work hotfix candidate
+
+- Archive: `computer_core_2_0.2.3.zip`, 145 files.
+- SHA-256: `d81676a931a92fbe500ea20a6d35b58d1a9bac30237c5387ebc40f4d9d1f182b`.
+- Exact packaged base and expansion checks: 380 initial and 512 cumulative each;
+  all six processes exited zero with completion markers and no forced kills.
+- Reproduced `invalid path` by entering shell commands character by character.
+  Whole-command paste bypassed the empty filename-prefix completion query.
+- `fs.getName('')` and `fs.getDir('')` now return empty lexical metadata after
+  normal work admission. Empty file writes still cannot overwrite root; root
+  directory creation remains its existing no-op. NUL paths remain rejected.
+- Shell/editor workflows now type commands one character at a time, including
+  `edit /edited.lua`, save/reload/reopen and program execution. Zero-credit empty
+  metadata calls are checked for atomic refusal, alongside the existing budgets.
+- Program-name suffix recognition now uses literal slicing, line writing uses
+  plain newline search, and completion filters candidates before guest sorting.
+  The line reader clears its dirty flag after painting; an unrelated timer event
+  no longer repaints unchanged input. A real nested-window regression covers it.
+- Identical character-by-character `/rc/editors/basic.lua /basic.txt` entry and
+  editor-startup fixture: 716 scheduler ticks / 2146304 instructions before these
+  optimizations, 332 ticks / 1032192 instructions after, in both packaged variants.
+  Collection ticks are included (192 before, 80 after). These are simulated guest
+  workflow measurements, not per-keystroke or native client latency claims.
+- Tab-completing `ed` still launches the real advanced editor, and save/reload/
+  reopen workflows pass. Shared execution/resource caps remain unchanged.
+- Pinned-source reproduction passes for all 21 patches; shutdown tests pass 7/7.
+- This section describes a locally tested candidate, not publication or native
+  client acceptance. Prior failing source logs remain retained.

@@ -1,4 +1,4 @@
-# Known limitations — 0.2.2 alpha
+# Known limitations — 0.2.3 alpha
 
 This is an experimental, breaking terminal-OS playtest, **not full CraftOS** and
 not a stable release. This document does not certify completed source integration,

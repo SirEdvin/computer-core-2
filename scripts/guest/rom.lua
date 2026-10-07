@@ -1015,9 +1015,11 @@ function shell.programs(hidden)
   for search in thread.vars().path:gmatch("[^:]+") do
     local files = fs.list(shell.resolve(search))
     for i=1, #files, 1 do
-      programs[#programs+1] = files[i]:match("^(.+)%.lua$")
-      if programs[#programs] then
-        seen[programs[#programs]] = true
+      local file = files[i]
+      if #file > 4 and file:sub(-4) == ".lua" then
+        local name = file:sub(1, -5)
+        programs[#programs+1] = name
+        seen[name] = true
       end
     end
   end
@@ -2951,9 +2953,17 @@ function c.program(text, add_space)
     seen[full] = true
   end
 
-  table.sort(progs, function(a,b) return #a < #b end)
+  -- Nonmatching programs cannot contribute a suffix. Filter before sorting so
+  -- each key does not sort the entire executable list in guest bytecode.
+  local matching = {}
+  for i=1, #progs, 1 do
+    if progs[i]:sub(1, #text) == text then
+      matching[#matching+1] = progs[i]
+    end
+  end
+  table.sort(matching, function(a,b) return #a < #b end)
 
-  return completion.choice(text, progs, add_space)
+  return completion.choice(text, matching, add_space)
 end
 
 function c.programWithArgs(text, previous, starting)
@@ -5537,7 +5547,7 @@ local function write(text)
   end
 
   while #text > 0 do
-    local nl = text:find("\n") or #text
+    local nl = text:find("\n", 1, true) or #text
     local chunk = text:sub(1, nl)
     text = text:sub(#chunk + 1)
 
@@ -5631,6 +5641,7 @@ function term.read(replace, history, complete, default)
       if sty + ln > h then
         sty = sty - (sty + ln - h)
       end
+      dirty = false
     end
 
     -- set cursor to the appropriate spot

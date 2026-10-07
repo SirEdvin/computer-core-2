@@ -230,9 +230,11 @@ function shell.programs(hidden)
   for search in thread.vars().path:gmatch("[^:]+") do
     local files = fs.list(shell.resolve(search))
     for i=1, #files, 1 do
-      programs[#programs+1] = files[i]:match("^(.+)%.lua$")
-      if programs[#programs] then
-        seen[programs[#programs]] = true
+      local file = files[i]
+      if #file > 4 and file:sub(-4) == ".lua" then
+        local name = file:sub(1, -5)
+        programs[#programs+1] = name
+        seen[name] = true
       end
     end
   end

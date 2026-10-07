@@ -431,6 +431,9 @@ end
 local function metadata_path(vm, name)
   assert(type(name) == "string" and #name <= 1024, "invalid path")
   spend_filesystem_work(1 + 16 * (#name + #vm.disk.cwd + 1))
+  -- Completion queries an empty prefix before the first filename character.
+  -- Only lexical metadata accepts it; actual disk operations stay strict.
+  if name == "" then return "/" end
   return Filesystem.path(vm.disk, name)
 end
 native["fs.getName"] = function(vm, _, args) return tuple(metadata_path(vm, args[1]):match("[^/]+$") or "") end

@@ -1,6 +1,6 @@
-# 0.2.2 alpha playtest
+# 0.2.3 alpha playtest
 
-Experimental terminal-OS playtest guidance for the **0.2.2 alpha** build;
+Experimental terminal-OS playtest guidance for the **0.2.3 alpha** build;
 not a publication announcement or stable acceptance claim. Graphical/client tests
 below belong to the playtester and are **not yet passed**. See
 [known limitations](KNOWN_LIMITATIONS.md) before upgrading.
@@ -10,7 +10,7 @@ below belong to the playtester and are **not yet passed**. See
 1. **Back up your saves and keep an untouched copy.** Prefer a fresh test world;
    upgrade only a separate copy of an existing Computer Core 2 save.
 2. Use Factorio **2.0.77 or newer**. Copy the supplied
-   `computer_core_2_0.2.2.zip` into Factorio's `mods` directory and enable Computer
+   `computer_core_2_0.2.3.zip` into Factorio's `mods` directory and enable Computer
    Core 2. Do not enable the original `computer_core` alongside it. Ensure all
    multiplayer clients have the same mod version and startup settings.
 3. Verify the archive/version supplied by the maintainer; this document does not

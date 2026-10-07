@@ -55,7 +55,7 @@ function M.initial(check)
     and remaining >= saved and remaining <= Limits.filesystem_work_per_tick)
   storage.filesystem_budget_scheduler, storage.filesystem_budget_used = state, remaining
 
-  local calls = {"fs.exists('/tree')", "fs.isDir('/tree')", "fs.isReadOnly('/rc')", "fs.getSize('/tree/branch1')", "fs.list('/tree')", "fs.makeDir('/new/branch')", "fs.delete('/tree')", "fs.copy('/tree','/copy')", "fs.move('/tree','/moved')", "fs.combine('tree','branch1')", "fs.getName('/tree/branch1')", "fs.getDir('/tree/branch1')", "fs.getFreeSpace()"}
+  local calls = {"fs.exists('/tree')", "fs.isDir('/tree')", "fs.isReadOnly('/rc')", "fs.getSize('/tree/branch1')", "fs.list('/tree')", "fs.makeDir('/new/branch')", "fs.delete('/tree')", "fs.copy('/tree','/copy')", "fs.move('/tree','/moved')", "fs.combine('tree','branch1')", "fs.getName('/tree/branch1')", "fs.getDir('/tree/branch1')", "fs.getName('')", "fs.getDir('')", "fs.getFreeSpace()"}
   for _, code in ipairs(calls) do
     local vm = VM.new(assert(Compiler.compile('return pcall(function() '..code..' end)')))
     populate(vm)

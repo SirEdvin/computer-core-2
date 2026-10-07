@@ -89,4 +89,16 @@ inner.setPaletteColor(colors.yellow, 0xabcdef)
 assert(palettes == 1, "nested palette update must propagate one color, not all sixteen per ancestor")
 local r, g, b = native_term.getPaletteColor(colors.yellow)
 assert(math.abs(r - 0xab/255) < 0.000001 and math.abs(g - 0xcd/255) < 0.000001 and math.abs(b - 0xef/255) < 0.000001)
+-- An unrelated event must not redraw an already-painted input buffer.
+term.redirect(outer)
+local pulls, painted = 0, nil
+rc.pullEvent = function()
+  pulls = pulls + 1
+  if pulls == 1 then return "char", "Q" end
+  if pulls == 2 then painted = blits; return "timer", 999 end
+  assert(blits == painted, "idle shell events must not repaint unchanged text")
+  return "key", 257
+end
+assert(term.read() == "Q" and pulls == 3)
+term.redirect(native_term)
 return "upstream-terminal-pass"

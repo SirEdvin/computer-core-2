@@ -60,7 +60,8 @@ local function footer(vm, prefix)
   return vm.display.lines[vm.display.rows].text:sub(1, #prefix) == prefix
 end
 local function command(vm, text)
-  send(vm, 'paste', text)
+  -- Exercise interactive completion for every prefix, not just whole-command paste.
+  for i = 1, #text do send(vm, 'char', text:sub(i, i)) end
   send(vm, 'key', enter, false)
 end
 local function type_text(vm, text)
@@ -84,7 +85,8 @@ function M.initial(vm, check)
   pump(vm, function() return shell_ready(vm) and vm.disk.fs['/abcmidXYZ'] ~= nil end)
   check('shell middle paste preserves the complete filename suffix', vm.disk.fs['/abcXYZ'] == nil)
   command(vm, '/rc/editors/basic.lua /basic.txt')
-  pump(vm, function() return footer(vm, 'Press Control for menu') end)
+  local command_turns, command_work = pump(vm, function() return footer(vm, 'Press Control for menu') end)
+  check('interactive command completion avoids whole-list pattern and sorting work', command_turns <= 500 and command_work <= 1500000)
   check('actual basic editor starts through upstream shell', true)
   type_text(vm, 'b')
   local turns, instructions, collecting = pump(vm, function() return vm.display.lines[1].text:sub(1, 1) == 'b' end)
@@ -98,7 +100,10 @@ function M.initial(vm, check)
   check('basic editor multiline paste preserves suffix and insertion cursor', vm.disk.fs['/basic.txt'].text == 'xy\nz\n!b\n')
   menu(vm, 'e')
   pump(vm, function() return shell_ready(vm) end)
-  command(vm, 'edit /edited.lua')
+  type_text(vm, 'ed')
+  send(vm, 'key', 258, false) -- Tab still completes the filtered program list.
+  type_text(vm, '/edited.lua')
+  send(vm, 'key', enter, false)
   pump(vm, function() return footer(vm, 'Press Ctrl for menu') end)
   check('actual advanced editor starts through upstream edit command', true)
   send(vm, 'char', 'p')

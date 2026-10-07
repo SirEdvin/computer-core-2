@@ -138,7 +138,7 @@ local function write(text)
   end
 
   while #text > 0 do
-    local nl = text:find("\n") or #text
+    local nl = text:find("\n", 1, true) or #text
     local chunk = text:sub(1, nl)
     text = text:sub(#chunk + 1)
 
@@ -232,6 +232,7 @@ function term.read(replace, history, complete, default)
       if sty + ln > h then
         sty = sty - (sty + ln - h)
       end
+      dirty = false
     end
 
     -- set cursor to the appropriate spot
