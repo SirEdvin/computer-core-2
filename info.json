@@ -1,9 +1,9 @@
 {
   "name": "computer_core_2",
-  "version": "0.2.3",
+  "version": "0.3.0",
   "title": "Computer Core 2 (ALPHA)",
   "author": "SirEdvin; original Computer Core by Relik77 and contributors",
   "factorio_version": "2.0",
   "dependencies": ["base >= 2.0.77", "! computer_core"],
-  "description": "EXPERIMENTAL ALPHA PLAYTEST - terminal-only Lua OS with pinned Recrafted shell/editors, local files and durable guest execution. Breaking replacement of the 0.1.x workbench/callback APIs; old files/drafts are retained but programs are not converted. No guest world, circuit, wireless, speaker or HTTP APIs. Client rendering/input and multiplayer acceptance remain unverified. Use a fresh world or backed-up save copy; never downgrade a migrated save. Expect bugs, slow boot/editor response and API changes."
+  "description": "EXPERIMENTAL 0.3.0 ALPHA PLAYTEST - adds a blue, built-in-only event-driven shell computer alongside unchanged original/personal VM computers with Recrafted shell/editors. Blue files are data: no Lua scripts, editors or modules. Both models use existing computer research. No guest world/network APIs. Graphical input/rendering and multiplayer joins remain unverified. Back up saves, prefer a fresh test world and never downgrade a migrated save. Expect bugs and API changes."
 }

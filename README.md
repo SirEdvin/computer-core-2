@@ -1,7 +1,8 @@
-# Computer Core 2 — experimental 0.2.3 alpha
+# Computer Core 2 — experimental 0.3.0 alpha
 
-A terminal-only Lua computer for Factorio 2.0.77+, using a pinned Recrafted BIOS,
-shell and editors inside a durable guest VM. Existing world artwork is retained.
+A terminal-only computer mod for Factorio 2.0.77+. Original/personal computers use
+a pinned Recrafted BIOS, shell and editors inside a durable guest VM. A new blue
+physical computer uses a trusted, built-in-only event-driven shell. Original artwork is retained.
 This is an explicitly experimental playtest, not stable or full CraftOS compatibility.
 
 **Back up saves. Prefer a fresh world or a separate upgraded-save copy. Never
@@ -10,14 +11,14 @@ are still unverified and belong to the playtester.**
 
 ## Install and use
 
-1. Copy the supplied `computer_core_2_0.2.3.zip` into Factorio's `mods` directory.
+1. Copy the supplied `computer_core_2_0.3.0.zip` into Factorio's `mods` directory.
    Do not enable the original `computer_core` simultaneously.
 2. Research Personal Computer, then Computer. Supply power to a placed computer.
 3. Stay within ten tiles and Ctrl+left-click its body, or Ctrl+G for the private
    personal gauntlet (requires research and a character).
 4. Click the terminal itself to type or paste. Native capture is visually hidden; Enter
    submits. Use keyboard shortcuts for navigation; the fallback button row is removed.
-5. Type `edit /hello.lua`. Enter `print("Hello")`; Ctrl+M opens
+5. On the original VM model, type `edit /hello.lua`. Enter `print("Hello")`; Ctrl+M opens
    the editor menu, then type **s** to save or **e** to exit. Run `/hello.lua`.
 
 Close preserves the running OS. Reboot discards unsaved guest buffers, not saved
@@ -47,6 +48,19 @@ historical, not instructions for this OS. Current guest contracts are documented
 and [guest runtime](docs/GUEST_RUNTIME.md). Guides/examples remain repository-only.
 
 ## Build and verify
+
+The 0.3.0 alpha adds **Blue computer (shell only)**, unlocked by the same Computer
+research. Craft the blue item, place/power it and Ctrl+left-click within ten tiles.
+Try `help`, `pwd`, `mkdir /test`, `ls`, `cat /rom/help.txt`, `cp /rom/help.txt /test/help.txt`
+and `cat /test/help.txt`. It supports twelve built-ins, editing/history/Tab/paste,
+bounded local file jobs and committed-file clone/blueprint imports. Blue files
+are data: it cannot run Lua files, editors, modules or the original Recrafted OS.
+Original and personal VM computers keep their existing behavior and saves.
+
+See [the shell reference](docs/SHELL_RUNTIME.md), also bundled in the ZIP, and the
+blue checklist in [PLAYTEST.md](docs/PLAYTEST.md). This is a user-authorized test
+release despite the still-blocking graphical/multiplayer acceptance gates, not
+completed specification or stable-release acceptance.
 
 Python tools use the standard library; install official Factorio 2.0.77 headless
 separately. No engine executable is redistributed.

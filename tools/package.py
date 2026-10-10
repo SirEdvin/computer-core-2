@@ -18,6 +18,7 @@ def main():
     info = json.loads((ROOT / 'info.json').read_text())
     prefix = f'{info["name"]}_{info["version"]}'
     files = [ROOT / name for name in ['info.json', 'settings.lua', 'data.lua', 'control.lua', 'LICENSE']]
+    files.extend(ROOT / name for name in ['resources/shell/manifest.json', 'resources/blue/artwork.json', 'docs/SHELL_RUNTIME.md'])
     for directory in ['scripts', 'graphics', 'locale']:
         files.extend(path for path in (ROOT / directory).rglob('*') if path.is_file())
     manifest = json.loads((ROOT / 'vendor/manifest.json').read_text())
@@ -36,7 +37,21 @@ def main():
     with zipfile.ZipFile(archive) as check:
         assert check.testzip() is None, 'Corrupt archive'
         assert json.loads(check.read(f'{prefix}/info.json')) == info
-        assert not any('/tests/' in name or '/.git/' in name or '/docs/' in name or '/examples/' in name or (name.endswith('/README.md') and name != f'{prefix}/vendor/README.md') for name in check.namelist())
+        assert not any('/tests/' in name or '/.git/' in name or ('/docs/' in name and name != f'{prefix}/docs/SHELL_RUNTIME.md') or '/examples/' in name or (name.endswith('/README.md') and name != f'{prefix}/vendor/README.md') for name in check.namelist())
+        assert check.read(f'{prefix}/resources/shell/manifest.json') == (ROOT / 'resources/shell/manifest.json').read_bytes()
+        shell_manifest = json.loads(check.read(f'{prefix}/resources/shell/manifest.json'))
+        for record in shell_manifest['files']:
+            assert hashlib.sha256(check.read(f'{prefix}/{record["path"]}')).hexdigest() == record['sha256'], f'Shell source checksum mismatch: {record["path"]}'
+        assert hashlib.sha256(check.read(f'{prefix}/LICENSE')).hexdigest() == shell_manifest['license_sha256']
+        assert check.read(f'{prefix}/resources/blue/artwork.json') == (ROOT / 'resources/blue/artwork.json').read_bytes()
+        blue_artwork = json.loads(check.read(f'{prefix}/resources/blue/artwork.json'))
+        for record in blue_artwork['files']:
+            for path, digest in [(record['path'], record['sha256']), (record['source'], record['source_sha256'])]:
+                assert hashlib.sha256(check.read(f'{prefix}/{path}')).hexdigest() == digest, f'Artwork checksum mismatch: {path}'
+        assert hashlib.sha256(check.read(f'{prefix}/LICENSE')).hexdigest() == blue_artwork['license_sha256']
+        original = shell_manifest['unchanged_vm_resources']
+        for kind in ['manifest', 'rom']:
+            assert hashlib.sha256(check.read(f'{prefix}/{original[kind + "_path"]}')).hexdigest() == original[kind + '_sha256'], f'Original VM {kind} checksum mismatch'
         packaged_vendor = {name[len(prefix) + 1:] for name in check.namelist() if name.startswith(f'{prefix}/vendor/')}
         assert packaged_vendor == vendor_paths, 'Vendor archive inventory mismatch'
         for path in vendor_paths:

@@ -6,8 +6,9 @@ local Keys = require("scripts.terminal_keys")
 local function initialize()
   L.init()
   R.init()
+  for _,force in pairs(game.forces) do L.research(force) end
   for _, surface in pairs(game.surfaces) do
-    for _, entity in ipairs(surface.find_entities_filtered{name = "computer-interface-entity"}) do L.build(entity) end
+    for _, entity in ipairs(surface.find_entities_filtered{name = {"computer-interface-entity","blue-computer-interface-entity"}}) do L.build(entity) end
   end
 end
 script.on_init(initialize)
@@ -97,7 +98,11 @@ script.on_event(defines.events.on_player_setup_blueprint, function(event)
   local mapping = event.mapping and event.mapping.get() or {}
   for index, entity in pairs(mapping) do
     local id = entity.valid and storage.units[entity.unit_number]
-    if id then blueprint.set_blueprint_entity_tags(index, L.snapshot(storage.computers[id])) end
+    if id then
+      local tags,err=L.snapshot(storage.computers[id])
+      if tags then blueprint.set_blueprint_entity_tags(index,tags)
+      else player.print('Computer snapshot unavailable: '..tostring(err)) end
+    end
   end
 end)
 local function get(id)
@@ -108,11 +113,16 @@ local interface = {
   getComputerIDs = function() return U.keys(storage.computers) end,
   getComputer = function(id)
     local c = get(id)
+    local files,file_error=R.copy_files(c)
+    local status,status_error=R.status(c)
     return {id = c.id, label = c.label, position = U.data(c.position), force_index = c.force_index,
       surface_index = c.surface_index, personal = c.personal, player_index = c.player_index,
-      powered = not not R.powered(c), running = c.guest ~= nil and not c.os_stopped,
-      fs = U.data(R.files(c), {nodes = 65536, bytes = 4194304, depth = 32}),
-      migration_notice = c.migration_notice, error = c.os_error}
+      powered = not not R.powered(c), running = R.running(c), backend = c.backend or 'vm',
+      backend_version = R.backend(c)=='event-shell' and c.shell and c.shell.version or nil,
+      model = c.personal and 'personal' or c.entity and c.entity.valid and c.entity.name or nil,
+      status = status, file_error = file_error,
+      fs = files,
+      migration_notice = c.migration_notice, error = status_error or c.os_error}
   end,
   getLegacy = function(id)
     local c = get(id)

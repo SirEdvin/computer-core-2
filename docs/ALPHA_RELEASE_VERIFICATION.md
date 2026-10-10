@@ -133,3 +133,27 @@ workload responsiveness and full specification acceptance remain provisional.
 - Pinned-source reproduction passes for all 21 patches; shutdown tests pass 7/7.
 - This section describes a locally tested candidate, not publication or native
   client acceptance. Prior failing source logs remain retained.
+
+## 0.3.0 blue-shell alpha test release
+
+The user explicitly requested a published build for hands-on testing while the
+graphical and multiplayer gates remain unavailable. This authorization does not
+complete those gates or the remaining OpenSpec acceptance tasks.
+
+- Archive: `computer_core_2_0.3.0.zip`, 178 files.
+- SHA-256: `0fc551cdf4c4e563cbfcc45a05b842fe00e34eefc77dd8734505610bd36130d9`.
+- Repeated builds are byte-identical; original VM ROM/vendor resources remain
+  unchanged. Shell and blue-artwork manifests are verified against archive bytes.
+- Exact packaged Factorio 2.0.77 base and expansion: shell 205 initial / 260
+  cumulative after separate-process reload; VM plus structural GUI checks
+  413 / 545; maximum-work shell/VM-neighbor stress 11 / 50.
+- Additional real fixture-version configuration changes pass 205 / 260 in both
+  engine variants. All engine phases have completion markers, exit zero and no
+  forced kills. Cold server phases use acknowledged console shutdown.
+- Python tests: 40 passed. Graphical focus, rendered latency, multiplayer joins
+  and joining-peer registry reconstruction remain unverified and blocking.
+- Original/personal VM computers retain their behavior. Blue computers are
+  built-in-only terminals: files do not become executable Lua or user modules.
+
+Use the blue checklist in PLAYTEST.md on a fresh world or backed-up save copy.
+The test release is not stable-release or complete specification acceptance.

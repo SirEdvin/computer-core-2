@@ -9,6 +9,9 @@ import re
 import subprocess
 import tempfile
 from guest_rom_source import render as render_guest_rom
+from native_rom_source import verify as verify_native_rom
+from shell_resources import verify as verify_shell_resources
+from blue_artwork import verify as verify_blue_artwork
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -59,7 +62,8 @@ def verify(root=ROOT, upstream=None):
     assert 'local peripheral = require("peripheral")' not in completion.split('function c.peripheral', 1)[0]
     assert 'local peripheral = require("peripheral")' in completion.split('function c.peripheral', 1)[1]
     assert not any(path.endswith(('.so', '.dll', '.exe')) for path in paths)
-    return {'resources': len(paths), 'compiler_modules': len(compiler_modules), 'guest_files': len(guest_paths), 'patches': len(patches)}
+    return {'resources': len(paths), 'compiler_modules': len(compiler_modules), 'guest_files': len(guest_paths),
+            'patches': len(patches), **verify_native_rom(root), **verify_shell_resources(root), **verify_blue_artwork(root)}
 
 
 def main():

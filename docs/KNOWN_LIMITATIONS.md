@@ -1,4 +1,4 @@
-# Known limitations — 0.2.3 alpha
+# Known limitations — 0.3.0 alpha
 
 This is an experimental, breaking terminal-OS playtest, **not full CraftOS** and
 not a stable release. This document does not certify completed source integration,
@@ -6,6 +6,13 @@ a published archive, migration acceptance or graphical/multiplayer acceptance.
 Follow [PLAYTEST.md](PLAYTEST.md) on a fresh world or backed-up save copy.
 
 ## Compatibility boundary
+
+- The new blue model is a built-in-only event shell. It cannot run Lua source,
+  editors, modules or the Recrafted OS. Its local files are data; `/rom/help.txt`
+  is read-only data, not executable ROM. Original/personal VM computers retain
+  the source-program/editor behavior described below. The blue model is released
+  for explicitly authorized alpha testing; graphical and joining-peer acceptance
+  remain blocking and are not inferred from the packaged headless tests.
 
 - The new direction replaces the old workbench and named-handler/callback runtime
   with a vendored Recrafted shell/editor running Lua source in an isolated guest.

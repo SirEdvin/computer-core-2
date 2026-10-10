@@ -1,4 +1,4 @@
--- Terminal presentation only: the BIOS, shell and editors live in guest Lua.
+-- Terminal presentation only: VM applications or trusted direct-shell state.
 local U = require('scripts.util')
 local L = require('scripts.lifecycle')
 local R = require('scripts.os_runtime')
@@ -50,7 +50,9 @@ local function owns(frame,element)
   return false
 end
 local function status(frame,c,session)
-  local text=c.os_error or (not R.powered(c) and 'No power' or c.os_stopped and 'Stopped — Reboot to start' or c.guest and 'Running' or 'Booting…')
+  local state,err=R.status(c)
+  local text=err or (not R.powered(c) and 'No power' or state=='stopped' and 'Stopped — Reboot to start'
+    or state=='ready' and 'Running' or state=='initializing' and 'Initializing…' or state=='recovery' and 'Recovery required' or 'Booting…')
   if session.notice then text=session.notice end
   if frame and frame.cc2_status.caption~=text then frame.cc2_status.caption=text end
 end
@@ -60,12 +62,12 @@ local function send(player,c,session,...)
   return ok
 end
 local function tap(player,c,session,code)
-  if send(player,c,session,'key',code,false) then send(player,c,session,'key_up',code) end
+  if send(player,c,session,'key',code,false) and R.backend(c)=='vm' then send(player,c,session,'key_up',code) end
 end
 function M.render(player)
   local c,session,frame=current(player)
   if not c or not frame then return end
-  local display=c.guest and c.guest.display
+  local display=R.display(c)
   status(frame,c,session)
   if not display then return end
   local blink=display.blink and math.floor(game.tick/30)%2==0
@@ -139,14 +141,15 @@ function M.open(player,c)
   if not M.authorized(player,c) then return false end
   M.close(player)
   storage.sessions[player.index]={id=c.id}
-  local frame=player.gui.screen.add{type='frame',name='cc2_root',direction='vertical',caption=c.personal and 'Personal terminal' or 'Computer '..c.id}
+  local shell=R.backend(c)=='event-shell'
+  local frame=player.gui.screen.add{type='frame',name='cc2_root',direction='vertical',caption=c.personal and 'Personal terminal' or (shell and 'Shell computer ' or 'Computer ')..c.id}
   frame.auto_center=true
   local bar=frame.add{type='flow',name='cc2_bar',direction='horizontal'}
-  bar.add{type='button',name='cc2_reboot',caption='Reboot',tooltip='Restart execution. Unsaved guest editor buffers will be lost; saved files remain.'}
+  bar.add{type='button',name='cc2_reboot',caption='Reboot',tooltip=shell and 'Restart the shell and clear pending work/input. Committed files remain.' or 'Restart execution. Unsaved guest editor buffers will be lost; saved files remain.'}
   bar.add{type='button',name='cc2_shutdown',caption='Shutdown',tooltip='Pause this computer until Reboot. Closing the window does not stop it.'}
-  bar.add{type='button',name='cc2_terminate',caption='Terminate',tooltip='Send termination to the guest program.'}
+  bar.add{type='button',name='cc2_terminate',caption='Terminate',tooltip=shell and 'Cancel foreground work. Committed files remain.' or 'Send termination to the guest program.'}
   bar.add{type='button',name='cc2_close',caption='Close'}
-  frame.add{type='label',name='cc2_status',caption='Booting…',style='cc2_status',tooltip='Click the terminal to type or paste. Enter submits; Ctrl+M opens the editor menu.'}
+  frame.add{type='label',name='cc2_status',caption='Booting…',style='cc2_status',tooltip=shell and 'Built-in commands only. Click the terminal to type or paste; Enter submits.' or 'Click the terminal to type or paste. Enter submits; Ctrl+M opens the editor menu.'}
   if c.migration_notice then
     frame.add{type='label',caption='Alpha upgrade: old callbacks retired. Files/drafts retained; see /legacy-recovery and /legacy-startup*. Back up your save.',style='cc2_status'}.style.maximal_width=600
   end
@@ -172,8 +175,9 @@ function M.tick()
 end
 function M.resize(event)
   local player=game.get_player(event.player_index)
-  local c=player and current(player)
-  if c then M.open(player,c) end -- Presentation only; never changes guest geometry.
+  if not player then return end
+  local c,_,frame=current(player)
+  if c and frame and player.opened==frame then M.open(player,c) end -- Presentation only; never changes guest geometry.
 end
 function M.closed(event)
   local player=game.get_player(event.player_index)
@@ -195,7 +199,7 @@ function M.event(event)
   if not player then return end
   local c,session,frame=current(player)
   local element=event.element
-  if not c or not frame or not owns(frame,element) then return end
+  if not c or not frame or player.opened~=frame or not owns(frame,element) then return end
   local tags=element.tags
   if event.name==defines.events.on_gui_text_changed and element.name=='cc2_capture' then
     local text=element.text
@@ -210,13 +214,19 @@ function M.event(event)
     tap(player,c,session,257)
   elseif event.name==defines.events.on_gui_click then
     if element.name=='cc2_close' then M.close(player); return
-    elseif element.name=='cc2_reboot' then R.reboot(c); session.notice=nil
-    elseif element.name=='cc2_shutdown' then R.shutdown(c)
+    elseif element.name=='cc2_reboot' then
+      local accepted,err=R.reboot(c)
+      session.notice=accepted==false and ('Input refused: '..tostring(err)) or nil
+    elseif element.name=='cc2_shutdown' then
+      local accepted,err=R.shutdown(c)
+      session.notice=accepted==false and ('Input refused: '..tostring(err)) or nil
     elseif element.name=='cc2_terminate' then send(player,c,session,'terminate')
 
     elseif tags.cc2_cell then
-      local button=event.button==defines.mouse_button_type.right and 2 or event.button==defines.mouse_button_type.middle and 3 or 1
-      if send(player,c,session,'mouse_click',button,tags.x,tags.y) then send(player,c,session,'mouse_up',button,tags.x,tags.y) end
+      if R.backend(c)=='vm' then
+        local button=event.button==defines.mouse_button_type.right and 2 or event.button==defines.mouse_button_type.middle and 3 or 1
+        if send(player,c,session,'mouse_click',button,tags.x,tags.y) then send(player,c,session,'mouse_up',button,tags.x,tags.y) end
+      end -- Shell cells only restore keyboard focus; no mouse event contract.
     end
     if frame.valid then focus_capture(frame,session) end
   end

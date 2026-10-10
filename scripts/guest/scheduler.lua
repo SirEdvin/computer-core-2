@@ -8,11 +8,16 @@ function M.new()
   return {version = 1, machines = {}, order = {}, cursor = 1}
 end
 
-function M.add(state, id, vm)
+function M.add(state, id, vm, backend)
+  assert(backend==nil or backend=='vm' or backend=='event-shell','unsupported scheduled backend')
   assert(type(id) == "number" and id > 0 and id == math.floor(id), "invalid machine id")
   assert(not state.machines[id], "machine already admitted")
   assert(#state.order < Limits.active_computers, "active computer limit exceeded")
   state.machines[id] = vm
+  if backend=='event-shell' then
+    state.backends=state.backends or {}
+    state.backends[id]=backend
+  elseif state.backends then state.backends[id]=nil end
   state.order[#state.order + 1] = id
   table.sort(state.order)
 end
@@ -20,6 +25,7 @@ end
 function M.remove(state, id)
   if not state.machines[id] then return end
   state.machines[id] = nil
+  if state.backends then state.backends[id]=nil end
   for i, candidate in ipairs(state.order) do
     if candidate == id then
       table.remove(state.order, i)
@@ -30,7 +36,7 @@ function M.remove(state, id)
   if state.cursor > #state.order then state.cursor = 1 end
 end
 
-function M.tick(state, tick)
+function M.tick(state, tick, shell_step)
   assert(state.version == 1, "incompatible scheduler state")
   if tick ~= nil then assert(type(tick) == "number" and tick >= 0 and tick < 9007199254740992 and tick == math.floor(tick), "invalid scheduler tick") end
   if tick ~= nil and state.compile_budget and state.compile_budget.tick ~= nil then
@@ -88,7 +94,8 @@ function M.tick(state, tick)
     if state.cursor > #state.order then state.cursor = 1 end
     local id = state.order[state.cursor]
     local vm = state.machines[id]
-    if vm.collection and execution.collection >= Limits.collection_work_per_tick then break end
+    local backend=state.backends and state.backends[id]
+    if (backend==nil or backend=='vm') and vm.collection and execution.collection >= Limits.collection_work_per_tick then break end
     state.cursor = state.cursor + 1
     visited = visited + 1
     local work = execution.machines[id]
@@ -96,6 +103,15 @@ function M.tick(state, tick)
       work = {instructions = 0, collection = 0}
       execution.machines[id] = work
     end
+    if backend=='event-shell' then
+      -- The sole alternative is a trusted host-only stepper, never a saved
+      -- callback or executable identity from the machine's files/session.
+      assert(type(shell_step)=='function','event-shell stepper unavailable')
+      local previous=execution.instructions
+      shell_step(vm,state,id,tick)
+      used=used+execution.instructions-previous
+    else
+    assert(backend==nil or backend=='vm','unsupported scheduled backend')
     VM.reconcile_configured(vm)
     local aggregate_deferred = false
     if tick then
@@ -122,8 +138,8 @@ function M.tick(state, tick)
       if not ok then
         if err ~= refusal then error(err, 0) end
         aggregate_deferred = refusal.scope == "aggregate"
-        if aggregate_deferred then advances.deferred_aggregate = advances.deferred_aggregate + 1
-        else advances.deferred_per_computer = advances.deferred_per_computer + 1 end
+        if aggregate_deferred then advances.deferred_aggregate = (advances.deferred_aggregate or 0) + 1
+        else advances.deferred_per_computer = (advances.deferred_per_computer or 0) + 1 end
       end
     end
     if not vm.collection and vm.allocations_since_collection >= Limits.collection_interval then Collector.start(vm) end
@@ -184,6 +200,7 @@ function M.tick(state, tick)
     -- Keep the cursor after this machine rather than revisiting the same prefix.
     -- The selected guest still receives service when timer maintenance defers.
     if aggregate_deferred or execution.collection >= Limits.collection_work_per_tick then break end
+    end
   end
   return used, visited, collection_work, aggregate.used - before, strings.used - strings_before, terminals.used - terminals_before, filesystems.used - filesystems_before, events.used - events_before, advances.used - advances_before, tables.used - tables_before, continuations.used - continuations_before
 end

@@ -68,3 +68,19 @@ data:extend({computer, port, music, lamp, speaker,
   {type = "custom-input", name = "open-computer-gauntlet", key_sequence = "CONTROL + G", consuming = "game-only"},
   {type = "shortcut", name = "computer-gauntlet", action = "lua", associated_control_input = "open-computer-gauntlet", technology_to_unlock = "computer-gauntlet-technology", icon = prefix .. "icons/computer-gauntlet-icon.png", icon_size = 32, small_icon = prefix .. "icons/computer-gauntlet-icon.png", small_icon_size = 32}
 })
+-- Additive shell-only model; never mutate the original entity/item/recipe art.
+local blue = table.deepcopy(computer)
+blue.name = "blue-computer-interface-entity"
+blue.icon = prefix .. "icons/blue-computer-icon.png"
+blue.minable.result = "blue-computer-item"
+blue.picture.filename = prefix .. "entities/blue-computer_hr.png"
+local blue_item = table.deepcopy(data.raw.item["computer-item"])
+blue_item.name = "blue-computer-item"
+blue_item.icon = blue.icon
+blue_item.order = "z[computer]-b[shell]"
+blue_item.place_result = blue.name
+local blue_recipe = table.deepcopy(data.raw.recipe["computer-recipe"])
+blue_recipe.name = "blue-computer-recipe"
+blue_recipe.results = {{type = "item", name = "blue-computer-item", amount = 1}}
+data:extend({blue, blue_item, blue_recipe})
+table.insert(data.raw.technology["computer-technology"].effects, {type = "unlock-recipe", recipe = blue_recipe.name})

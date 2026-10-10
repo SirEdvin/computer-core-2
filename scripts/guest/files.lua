@@ -1,7 +1,7 @@
 -- Local/ROM filesystem only. Never resolve a peer mount or open native IO.
 local F = require("__computer_core_2__.scripts.filesystem")
 local Limits = require("__computer_core_2__.scripts.guest.limits")
-local sources = require("__computer_core_2__.scripts.guest.rom")
+local function create(sources)
 local M = {}
 local rom = {['/rc'] = {type = "dir"}}
 for path, text in pairs(sources) do
@@ -252,4 +252,8 @@ function M.close(vm, handle, spend)
   handle.text = ""
   if not ok then error(err, 0) end
 end
+return M
+end
+local M = create(require("__computer_core_2__.scripts.guest.rom"))
+M.with_sources = create -- Host-only factory; not a guest filesystem service.
 return M

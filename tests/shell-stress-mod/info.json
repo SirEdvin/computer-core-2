@@ -1,0 +1,8 @@
+{
+  "name": "computer_core_2_shell_stress_tests",
+  "version": "0.0.1",
+  "title": "Computer Core 2 admitted real-tick shell stress",
+  "author": "SirEdvin",
+  "factorio_version": "2.0",
+  "dependencies": ["base >= 2.0.77", "computer_core_2"]
+}

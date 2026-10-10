@@ -164,6 +164,7 @@ for _, name in ipairs({"isColor", "getTextColor", "getBackgroundColor", "setText
 end
 -- Called only at synchronized dispatch/configuration-change, never on_load.
 -- Returning true tells the event bridge to admit exactly one term_resize first.
+M.validate_geometry = geometry -- Host-only validation, not a guest method.
 function M.reconcile(display, columns, rows)
   geometry(columns, rows)
   if display.columns == columns and display.rows == rows then return false end

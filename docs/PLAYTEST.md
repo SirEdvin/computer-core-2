@@ -1,6 +1,6 @@
-# 0.2.3 alpha playtest
+# 0.3.0 alpha playtest
 
-Experimental terminal-OS playtest guidance for the **0.2.3 alpha** build;
+Experimental terminal-OS playtest guidance for the **0.3.0 alpha** build;
 not a publication announcement or stable acceptance claim. Graphical/client tests
 below belong to the playtester and are **not yet passed**. See
 [known limitations](KNOWN_LIMITATIONS.md) before upgrading.
@@ -10,7 +10,7 @@ below belong to the playtester and are **not yet passed**. See
 1. **Back up your saves and keep an untouched copy.** Prefer a fresh test world;
    upgrade only a separate copy of an existing Computer Core 2 save.
 2. Use Factorio **2.0.77 or newer**. Copy the supplied
-   `computer_core_2_0.2.3.zip` into Factorio's `mods` directory and enable Computer
+   `computer_core_2_0.3.0.zip` into Factorio's `mods` directory and enable Computer
    Core 2. Do not enable the original `computer_core` alongside it. Ensure all
    multiplayer clients have the same mod version and startup settings.
 3. Verify the archive/version supplied by the maintainer; this document does not
@@ -98,3 +98,40 @@ Leave each item unchecked until actually exercised in the supplied build.
 Report the exact mod/Factorio versions, enabled mods, startup terminal dimensions,
 resolution/UI scale, single- or multiplayer context, steps, expected/actual result,
 and relevant logs. Preserve a reproducible save copy; screenshots help with UI bugs.
+
+## 0.3.0 blue shell alpha: additional client checks
+
+Only use a supplied, checksum-identified candidate archive and a backed-up test
+world. This is a user-authorized alpha, not completed acceptance. Existing computer research
+unlocks both physical recipes; personal terminals and original bodies remain VM.
+Blue bodies provide built-in commands only: no editor, Lua execution, modules or
+world/network APIs. Supply power and open within the existing research/force/
+surface/range restrictions. Initialization may precede the first prompt.
+
+The implementation has headless lifecycle and table-backed GUI routing tests,
+not native client acceptance. Leave these boxes unchecked until genuinely tested:
+
+- [ ] Open both models, distinguish blue artwork/title/status, and confirm that
+      the original VM still supports its existing programs without conversion.
+- [ ] Click a blue cell to focus typing without an unsupported-mouse error.
+      Individually type, navigate, delete, use history/Tab, then paste CRLF text;
+      confirm one-space normalization and that paste alone executes nothing.
+- [ ] Switch to another GUI and change resolution/UI scale. The inactive terminal
+      must not steal focus or accept stale text, Enter, Reboot or Shutdown.
+- [ ] Resize the active terminal and check immediate prompt/cursor redraw before
+      typing another character; command/history/job state must remain intact.
+- [ ] Run help and file commands, close during pending output/file work, reopen
+      and verify the same session and exactly-once committed effects.
+- [ ] Cut power during a job, check visible refusal of input/lifecycle controls,
+      restore power and verify continued progress without reboot or lost files.
+- [ ] Use Terminate, Shutdown and Reboot; verify pending-work semantics and
+      committed-file retention. Refused lifecycle requests must be visible.
+- [ ] Revoke research or move beyond range/across force/surface boundaries;
+      stale-view keyboard, text/paste and controls must change no runtime data.
+- [ ] Keep original VM and blue viewers open simultaneously; input/display must
+      target the intended backend. Then repeat shared-view behavior with real
+      clients and join during partial input plus a pending job.
+
+Record exact archive hash, Factorio version, startup geometry, UI scale, event/job
+state and reproducible steps. Keep screenshots/logs outside the repository. Real
+graphical latency and multiplayer joining remain blocking acceptance gates.
