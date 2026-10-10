@@ -1,6 +1,6 @@
 local U = require("scripts.util")
 local FS = require("scripts.filesystem")
-local R = require("scripts.runtime")
+local R = require("scripts.os_runtime")
 local A = require("scripts.adapters")
 local M = {}
 local specs = {
@@ -10,8 +10,14 @@ local specs = {
   speaker = {name = "computer-speaker", x = 0, y = 0},
   speaker_combinator = {name = "computer-speaker-combinator", x = 0, y = 0}
 }
+function M.research(force)
+  local technology=force.technologies['computer-technology']
+  local recipe=force.recipes['blue-computer-recipe']
+  -- Only reconcile the newly added unlock. Preserve all original/manual effects.
+  if technology and technology.researched and recipe then recipe.enabled=true end
+end
 function M.init()
-  storage.schema = 1
+  storage.schema = storage.schema or 1
   storage.computers = storage.computers or {}
   storage.units = storage.units or {}
   storage.children = storage.children or {}
@@ -55,6 +61,7 @@ function M.ensure(c)
   if not c.entity or not c.entity.valid then return end
   M.sync(c)
   if c.external then return end
+  if R.backend(c)~='vm' then return end -- No fallback/peripheral construction for shell or recovery records.
   c.sub = c.sub or {}
   for _, key in ipairs(U.keys(specs)) do
     local spec, child = specs[key], c.sub[key]
@@ -77,16 +84,23 @@ function M.ensure(c)
   end
 end
 function M.build(entity, tags)
-  if not entity or not entity.valid or entity.name ~= "computer-interface-entity" then return end
+  if not entity or not entity.valid or (entity.name ~= "computer-interface-entity" and entity.name ~= "blue-computer-interface-entity") then return end
   local existing = storage.units[entity.unit_number]
   if existing then M.ensure(storage.computers[existing]); return storage.computers[existing] end
   local c = allocate()
+  if entity.name=='blue-computer-interface-entity' then c.backend='event-shell' end
   c.entity = entity
+  c.unit_number=entity.unit_number
   M.sync(c)
   storage.units[entity.unit_number] = c.id
   c.registration = script.register_on_object_destroyed(entity)
   storage.destroyed[c.registration] = c.id
-  if tags and tags.computer_core_2 then
+  if tags and tags.computer_core_2~=nil then
+    if c.backend=='event-shell' then
+      local shell,err=R.construct_shell(c.id,tags.computer_core_2)
+      if shell then c.shell=shell
+      else c.os_error='Blueprint files not accepted: '..tostring(err)..'; rebuild from the unchanged blueprint' end
+    else
     local ok, snapshot = pcall(U.data, tags.computer_core_2, {nodes = 65536, bytes = 4194304, depth = 32})
     if ok and type(snapshot) == "table" and type(snapshot.fs) == "table" then
       -- Blueprint payloads are untrusted; validate the complete filesystem first.
@@ -102,6 +116,7 @@ function M.build(entity, tags)
         c.fs = probe.fs
       end)
       if not valid then R.output(c, "Blueprint files rejected: invalid filesystem\n") end
+    end
     end
   end
   M.ensure(c)
@@ -147,7 +162,11 @@ function M.remove(id)
       if child.valid then storage.children[child.unit_number] = nil; child.destroy() end
     end
   end
-  for unit, cid in pairs(storage.units) do if cid == id then storage.units[unit] = nil end end
+  if R.backend(c)=='event-shell' and c.unit_number then
+    if storage.units[c.unit_number]==id then storage.units[c.unit_number]=nil end
+  else
+    for unit, cid in pairs(storage.units) do if cid == id then storage.units[unit] = nil end end
+  end
   if c.registration then storage.destroyed[c.registration] = nil end
   if c.personal then storage.personal[c.player_index] = nil end
   storage.computers[id] = nil
@@ -160,11 +179,40 @@ function M.removed(entity)
 end
 function M.clone(source, destination)
   if not destination or not destination.valid then return end
-  if destination.name == "computer-interface-entity" then
+  if (destination.name=='blue-computer-interface-entity' or destination.name=='computer-interface-entity')
+    and storage.units[destination.unit_number] then return nil,'Clone destination is already registered' end
+  if destination.name=='blue-computer-interface-entity' then
+    local original=source and source.valid and storage.computers[storage.units[source.unit_number]]
+    local files,err
+    if original and R.backend(original)=='event-shell' then files,err=R.files(original)
+    else err='Source backend cannot be cloned into the blue shell model' end
+    local shell
+    if files then shell,err=R.construct_shell(storage.next_computer+1,{fs=files}) end
+    if not shell then
+      destination.destroy{raise_destroy=true}
+      if source and source.valid then source.force.print('Computer clone unavailable: '..tostring(err)) end
+      return nil,err
+    end
+    local c=M.build(destination)
+    c.shell=shell
+    return c
+  elseif destination.name == "computer-interface-entity" then
     local original = source and source.valid and storage.computers[storage.units[source.unit_number]]
+    local files,err
+    if original then
+      files,err=R.files(original)
+      if not files or R.backend(original)~='vm' then
+        err=err or 'Source backend cannot be cloned into an original VM model'
+        -- This duplicate has not committed any computer state. Do not leave it
+        -- for reconciliation to boot as a VM with stale/unfinished source files.
+        destination.destroy{raise_destroy=true}
+        source.force.print('Computer clone unavailable: '..tostring(err))
+        return nil,err
+      end
+    end
     local c = M.build(destination)
     if original then
-      c.fs, c.state, c.vars = U.data(original.fs, {nodes = 65536, bytes = 4194304, depth = 32}), U.data(original.state), U.data(original.vars)
+      c.fs, c.state, c.vars = U.data(files, {nodes = 65536, bytes = 4194304, depth = 32}), U.data(original.state), U.data(original.vars)
       c.extension_state = U.data(original.extension_state)
       -- Deliberately do not copy identity, label, running process or pending effects.
     end
@@ -211,6 +259,8 @@ function M.tick()
   end
 end
 function M.snapshot(c)
-  return {computer_core_2 = {fs = U.data(c.fs, {nodes = 65536, bytes = 4194304, depth = 32})}}
+  local files,err=R.copy_files(c)
+  if not files then return nil,err end
+  return {computer_core_2 = {fs = files}}
 end
 return M

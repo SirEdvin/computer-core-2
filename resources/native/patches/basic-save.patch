@@ -1,0 +1,27 @@
+--- vendor/recrafted/rom/editors/basic.lua
++++ native/rom/editors/basic.lua
+@@ -82,10 +82,20 @@
+   if not handle then
+     state.status = err
+   else
+-    for i=1, #state.lines, 1 do
+-      handle:write(state.lines[i] .. "\n")
+-    end
+-    handle:close()
++    local ok, failure = pcall(function()
++      for i=1, #state.lines, 1 do
++        assert(handle:write(state.lines[i] .. "\n"))
++      end
++      handle:close()
++    end)
++    if not ok then
++      -- Closing after a failed write could commit a staged prefix. Discard it.
++      pcall(function() handle:abort() end)
++      local width = term.getSize()
++      state.status = ("Save failed: " .. tostring(failure)):sub(1, width)
++      state.unsaved = true
++      return
++    end
+     state.status = "Saved to " .. state.file
+     state.unsaved = false
+   end

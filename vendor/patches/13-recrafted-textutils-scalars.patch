@@ -1,0 +1,16 @@
+--- data/computercraft/lua/rom/apis/textutils.lua
++++ vendor/recrafted/rom/apis/textutils.lua
+@@ -251,6 +251,13 @@
+   elseif type(t) == "function" or type(t) == "thread" or
+       type(t) == "userdata" then
+     error("cannot serialize type " .. type(t), 2)
++  elseif type(t) == "number" then
++    if t ~= t then return "(0/0)" end
++    if t == math.huge then return "(1/0)" end
++    if t == -math.huge then return "(-1/0)" end
++    return string.format("%.17g", t)
++  elseif type(t) == "boolean" or type(t) == "nil" then
++    return tostring(t)
+   else
+     return string.format("%q", t)
+   end

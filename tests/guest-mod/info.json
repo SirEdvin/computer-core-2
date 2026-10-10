@@ -1,0 +1,8 @@
+{
+  "name": "computer_core_2_guest_tests",
+  "version": "0.0.1",
+  "title": "Computer Core 2 guest feasibility tests",
+  "author": "SirEdvin",
+  "factorio_version": "2.0",
+  "dependencies": ["base >= 2.0.77", "computer_core_2"]
+}

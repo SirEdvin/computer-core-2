@@ -1,0 +1,8 @@
+{
+  "name": "computer_core_2_workflow_benchmark",
+  "version": "0.0.1",
+  "title": "Computer Core 2 matched real-tick workflow benchmark",
+  "author": "SirEdvin",
+  "factorio_version": "2.0",
+  "dependencies": ["base >= 2.0.77", "computer_core_2"]
+}

@@ -1,27 +1,28 @@
 local U = require("scripts.util")
 local L = require("scripts.lifecycle")
-local R = require("scripts.runtime")
-local FS = require("scripts.filesystem")
-local S = require("scripts.shell")
-local GUI = require("scripts.gui")
+local R = require("scripts.os_runtime")
+local GUI = require("scripts.terminal_gui")
+local Keys = require("scripts.terminal_keys")
 local function initialize()
   L.init()
+  R.init()
+  for _,force in pairs(game.forces) do L.research(force) end
   for _, surface in pairs(game.surfaces) do
-    for _, entity in ipairs(surface.find_entities_filtered{name = "computer-interface-entity"}) do L.build(entity) end
+    for _, entity in ipairs(surface.find_entities_filtered{name = {"computer-interface-entity","blue-computer-interface-entity"}}) do L.build(entity) end
   end
 end
 script.on_init(initialize)
 script.on_load(R.on_load)
 script.on_configuration_changed(function()
   initialize()
-  -- Existing source snapshots continue; each dispatch reconstructs its runtime.
+  -- Old callbacks are retired, files/drafts retained, and guest state is not rebooted.
   for _, c in pairs(storage.computers) do if c.sub then L.ensure(c) end end
-  for _, player in pairs(game.players) do if storage.sessions[player.index] then GUI.render(player) end end
+  for _, player in pairs(game.players) do GUI.close(player) end
 end)
 script.on_event(defines.events.on_tick, function()
   L.tick()
   R.tick()
-  if game.tick % 6 == 0 then GUI.tick() end
+  GUI.tick() -- Row-diffed presentation; typing no longer waits for a six-tick poll.
 end)
 local function built(event)
   L.build(event.entity or event.created_entity or event.destination, event.tags)
@@ -87,6 +88,9 @@ end)
 script.on_event({defines.events.on_gui_click, defines.events.on_gui_text_changed, defines.events.on_gui_confirmed, defines.events.on_gui_selection_state_changed}, GUI.event)
 script.on_event(defines.events.on_gui_closed, GUI.closed)
 script.on_event({defines.events.on_player_display_resolution_changed, defines.events.on_player_display_scale_changed}, GUI.resize)
+for _, key in ipairs(Keys.bindings) do
+  script.on_event(key.name, function(event) GUI.key(event, key.code) end)
+end
 script.on_event(defines.events.on_player_setup_blueprint, function(event)
   local player = game.get_player(event.player_index)
   local blueprint = player.blueprint_to_setup
@@ -94,7 +98,11 @@ script.on_event(defines.events.on_player_setup_blueprint, function(event)
   local mapping = event.mapping and event.mapping.get() or {}
   for index, entity in pairs(mapping) do
     local id = entity.valid and storage.units[entity.unit_number]
-    if id then blueprint.set_blueprint_entity_tags(index, L.snapshot(storage.computers[id])) end
+    if id then
+      local tags,err=L.snapshot(storage.computers[id])
+      if tags then blueprint.set_blueprint_entity_tags(index,tags)
+      else player.print('Computer snapshot unavailable: '..tostring(err)) end
+    end
   end
 end)
 local function get(id)
@@ -102,29 +110,27 @@ local function get(id)
   return storage.computers[id]
 end
 local interface = {
-  addComputerAPI = R.register,
-  addEntityStructure = function(structure)
-    assert(type(structure) == "table" and R.supports(structure.entity), "structure entity requires a registered API selector")
-    return L.attach(structure.entity, structure).id
-  end,
-  registerEntity = function(entity) assert(R.supports(entity), "entity has no registered API selector"); return L.attach(entity).id end,
-  removeComputerAPI = function(name) storage.extensions[name] = nil end,
   getComputerIDs = function() return U.keys(storage.computers) end,
   getComputer = function(id)
     local c = get(id)
-    return {id = c.id, label = c.label, position = U.data(c.position), force_index = c.force_index, surface_index = c.surface_index, personal = c.personal, player_index = c.player_index, powered = not not R.powered(c), running = c.process ~= nil, state = U.data(c.state), output = c.output, input = c.input, outputs = U.data(c.outputs), fs = U.data(c.fs, {nodes = 65536, bytes = 4194304, depth = 32}), vars = U.data(c.vars), extension_state = U.data(c.extension_state), process = c.process and U.data(c.process, {nodes = 65536, bytes = 4194304, depth = 32})}
+    local files,file_error=R.copy_files(c)
+    local status,status_error=R.status(c)
+    return {id = c.id, label = c.label, position = U.data(c.position), force_index = c.force_index,
+      surface_index = c.surface_index, personal = c.personal, player_index = c.player_index,
+      powered = not not R.powered(c), running = R.running(c), backend = c.backend or 'vm',
+      backend_version = R.backend(c)=='event-shell' and c.shell and c.shell.version or nil,
+      model = c.personal and 'personal' or c.entity and c.entity.valid and c.entity.name or nil,
+      status = status, file_error = file_error,
+      fs = files,
+      migration_notice = c.migration_notice, error = status_error or c.os_error}
   end,
-  getEntity = function(id) return get(id).entity end,
-  getPorts = function(id) local c = get(id); return c.sub and {left = c.sub.left_combinator, right = c.sub.right_combinator, speaker = c.sub.speaker, music = c.sub.speaker_combinator, lamp = c.sub.lamp} end,
-  run = function(id, source, name, args) return R.start(get(id), source, name, args) end,
-  stop = function(id) R.stop(get(id)) end,
-  exec = function(id, line) return S.execute(get(id), line) end,
-  input = function(id, text) R.input(get(id), text) end,
+  getLegacy = function(id)
+    local c = get(id)
+    return U.data({files = c.legacy_files, drafts = c.legacy_drafts}, {nodes = 131072, bytes = 8388608, depth = 32})
+  end,
   open = function(id, player_index) return GUI.open(game.get_player(player_index), get(id)) end,
   openGauntlet = function(player_index) return GUI.gauntlet(game.get_player(player_index)) end,
   snapshot = function(id) return L.snapshot(get(id)) end
 }
--- Compatibility discovery name retained for companion mods, with a source-only
--- extension contract. All remote callers are trusted Factorio mods, not players.
-remote.add_interface("computer_core", interface)
+-- Trusted mod callers only; player GUI/input authorization is rechecked separately.
 remote.add_interface("computer_core_2", interface)

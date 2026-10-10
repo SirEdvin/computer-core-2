@@ -1,0 +1,28 @@
+--- vendor/recrafted/rom/modules/main/rc/io.lua
++++ native/rom/modules/main/rc/io.lua
+@@ -27,7 +27,7 @@
+ 
+   for i=1, args.n, 1 do
+     local format = args[i]
+-    if format:sub(1,1) == "*" then
++    if type(format) == "string" and format:sub(1,1) == "*" then
+       format = format:sub(2)
+     end
+ 
+@@ -88,8 +88,15 @@
+ end
+ 
+ function _file:close()
++  self.handle.close()
+   self.closed = true
+-  pcall(self.handle.close)
++end
++
++-- Native-only discard, never flush a partial draft after a refused save.
++function _file:abort()
++  assert(self.handle.abort, "file does not support abort")
++  self.handle.abort()
++  self.closed = true
+ end
+ 
+ local function iofile(handle)

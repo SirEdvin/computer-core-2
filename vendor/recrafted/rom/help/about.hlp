@@ -1,0 +1,14 @@
+Recrafted is ComputerCraft's CraftOS but with saner API design. It's also not licensed under the CCPL, but rather the MIT license -- so you can freely use Recrafted's code in other projects without being legally bound to license them under the CCPL.
+
+
+All APIs are implemented as described on the CC: Tweaked wiki at 
+>>color blue
+https://tweaked.cc
+>>color white
+, with slight modifications to fit Recrafted's API design. Certain modules not written by Dan200 have been adapted from CraftOS, relicensed under the MIT license with permission from their authors.
+
+See 
+>>color blue
+https://ocaweso.me/recrafted
+>>color white
+ for more information on Recrafted.

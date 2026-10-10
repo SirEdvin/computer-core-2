@@ -1,0 +1,247 @@
+--- src/parser.lua
++++ vendor/phobos/parser.lua
+@@ -1,8 +1,8 @@
+ 
+-local util = require("util")
+-local ast = require("ast_util")
+-local nodes = require("nodes")
+-local error_code_util = require("error_code_util")
++local util = require("__computer_core_2__.vendor.phobos.util")
++local ast = require("__computer_core_2__.vendor.phobos.ast_util")
++local nodes = require("__computer_core_2__.vendor.phobos.nodes")
++local error_code_util = require("__computer_core_2__.vendor.phobos.error_code_util")
+ 
+ ---a fake value to prevent assertions from failing during node creation
+ ---since there are cases where not all required information is available yet,
+@@ -42,6 +42,14 @@
+ ----------------------------------------------------------------------
+ 
+ local statement, expr
++local parse_depth, max_parse_depth
++local function enter_parse()
++  util.spend_work()
++  if max_parse_depth and parse_depth >= max_parse_depth then
++    error("source parse nesting limit exceeded", 0)
++  end
++  parse_depth = parse_depth + 1
++end
+ 
+ -- local function copy_iter_state()
+ --   return {
+@@ -163,6 +171,7 @@
+   error_code_inst.source = source
+   local invalid = nodes.new_invalid{error_code_inst = error_code_inst}
+   if error_code_insts_insertion_index then
++    util.spend_work(#error_code_insts - error_code_insts_insertion_index + 1)
+     table.insert(error_code_insts, error_code_insts_insertion_index, error_code_inst)
+   else
+     error_code_insts[#error_code_insts+1] = error_code_inst
+@@ -238,8 +247,10 @@
+ --- `stat_list -> { stat [';'] }`
+ ---@param scope AstScope
+ local function stat_list(scope)
++  enter_parse()
+   local stop
+   while not next_token_ends_block() do
++    util.spend_work()
+     if token.token_type == "eof" then
+       break
+     elseif token.token_type == "return" then
+@@ -254,6 +265,7 @@
+       break
+     end
+   end
++  parse_depth = parse_depth - 1
+ end
+ 
+ --- `index -> '[' expr ']'`
+@@ -331,6 +343,7 @@
+   }
+   assert(assert_next("{") == nil, "Do not call 'constructor' if the current token is not '{'.")
+   while token.token_type ~= "}" do
++    util.spend_work()
+     node.fields[#node.fields+1] = field(scope)
+     if test_next(",") or test_next(";") then
+       node.comma_tokens[#node.comma_tokens+1] = new_token_node(true)
+@@ -352,6 +365,7 @@
+     return params
+   end
+   while true do
++    util.spend_work()
+     if test_next("ident") then
+       local param_def
+       param_def, params[#params+1] = ast.create_local(prev_token, scope)
+@@ -386,6 +400,7 @@
+   -- body -> `(` param_list `)`  block END
+   local parent_functiondef = scope
+   while parent_functiondef.node_type ~= "functiondef" do
++    util.spend_work()
+     parent_functiondef = parent_functiondef.parent_scope
+   end
+   local node = nodes.new_functiondef{
+@@ -430,6 +445,7 @@
+   local el = {expr(scope)}
+   local comma_tokens = {}
+   while test_next(",") do
++    util.spend_work()
+     comma_tokens[#comma_tokens+1] = new_token_node(true)
+     el[#el+1] = expr(scope)
+   end
+@@ -480,6 +496,7 @@
+ local function init_concat_src_paren_wrappers(node)
+   node.concat_src_paren_wrappers = node.concat_src_paren_wrappers or {}
+   for i = 1, #node.exp_list - 1 do
++    util.spend_work()
+     node.concat_src_paren_wrappers[i] = node.concat_src_paren_wrappers[i] or {}
+   end
+ end
+@@ -610,6 +627,7 @@
+   local ex = primary_exp(scope)
+   local should_break = false
+   while ex.node_type ~= "invalid" do
++    util.spend_work()
+     ex = ((suffixed_lut)[token.token_type] or function(ex)
+       should_break = true
+       return ex
+@@ -660,6 +678,7 @@
+   end,
+   ["..."] = function(scope)
+     while scope.node_type ~= "functiondef" do
++      util.spend_work()
+       scope = scope.parent_scope
+     end
+     if not scope.is_vararg then
+@@ -758,6 +777,7 @@
+ ---@return AstExpression completed
+ ---@return string next_op
+ local function sub_expr(limit, scope)
++  enter_parse()
+   local node
+   do
+     local prio = unop_prio[token.token_type]
+@@ -776,6 +796,7 @@
+   local binop = token.token_type--[[@as AstBinOpOp|".."]]
+   local prio = binop_prio[binop]
+   while prio and prio.left > limit do
++    util.spend_work()
+     local op_token = new_token_node()
+     next_token() -- consume `binop`
+     local right_node, next_op = sub_expr(prio.right, scope)
+@@ -785,6 +806,7 @@
+         -- needs to init before adding the node to the exp_list so that the
+         -- insert of another concat_src_paren_wrappers doesn't make the list too long
+         init_concat_src_paren_wrappers(right_node)
++        util.spend_work(#right_node.exp_list + #right_node.op_tokens + #right_node.concat_src_paren_wrappers)
+         table.insert(right_node.exp_list, 1, node)
+         node = right_node
+         table.insert(node.op_tokens, 1, op_token)
+@@ -815,6 +837,7 @@
+     binop = next_op
+     prio = binop_prio[binop]
+   end
++  parse_depth = parse_depth - 1
+   return node, binop
+ end
+ 
+@@ -1019,6 +1042,7 @@
+     comma_tokens = {},
+   }
+   while test_next(",") do
++    util.spend_work()
+     node.comma_tokens[#node.comma_tokens+1] = new_token_node(true)
+     local ident = assert_ident()
+     if is_invalid(ident) then
+@@ -1110,6 +1134,7 @@
+   local ifs = {}
+   local invalid ---@type boolean?
+   repeat
++    util.spend_work()
+     ifs[#ifs+1], invalid = test_then_block(scope)
+   until token.token_type ~= "elseif" or invalid
+   local elseblock
+@@ -1170,6 +1195,7 @@
+   end
+   local local_defs = {}
+   repeat
++    util.spend_work()
+     local ident = assert_ident()
+     if is_invalid(ident) then
+       node.lhs[#node.lhs+1] = ident--[[@as AstLocalReference]]
+@@ -1187,6 +1213,7 @@
+   end
+   -- add the locals after the expression list has been parsed
+   for _, name_local in ipairs(local_defs) do
++    util.spend_work()
+     scope.locals[#scope.locals+1] = name_local
+   end
+   return node
+@@ -1205,6 +1232,7 @@
+   local name = ast.resolve_ref_at_end(scope, ident.value, ident)
+ 
+   while token.token_type == "." do
++    util.spend_work()
+     name = suffixed_lut["."](name, scope)
+   end
+ 
+@@ -1379,6 +1407,7 @@
+     -- continue parsing the rest of the file as if it's part of the main body
+     -- because the main body is the highest scope we got
+     while not test_next("eof") do
++      util.spend_work()
+       ast.append_stat(main, statement(main))
+     end
+   end
+@@ -1386,11 +1415,12 @@
+   return main
+ end
+ 
+-local tokenize = require("tokenize")
++local tokenize = require("__computer_core_2__.vendor.phobos.tokenize")
+ ---@param text string
+ ---@param source_name string
+ ---@param options Options?
+ local function parse(text, source_name, options)
++  parse_depth, max_parse_depth = 0, options and options.max_parse_depth
+   source = source_name
+   prevent_assert = nodes.new_invalid{
+     error_code_inst = error_code_util.new_error_code{
+@@ -1413,6 +1443,7 @@
+     end
+     local leading = {}
+     while true do
++      util.spend_work()
+       index,token = token_iter(token_iter_state,index)
+       if not token then
+         token = {token_type="eof", leading = leading}
+@@ -1436,6 +1467,7 @@
+         if token.token_type == "invalid" then
+           err_pos_token = token
+           for _, error_code_inst in ipairs(token.error_code_insts) do
++            util.spend_work()
+             syntax_error(error_code_inst, nil, nil, token)
+           end
+         end
+@@ -1449,6 +1481,7 @@
+     start_at = start_at or index
+     local peek_tok
+     repeat
++      util.spend_work()
+       start_at,peek_tok = token_iter(token_iter_state,start_at)
+     until peek_tok.token_type ~= "blank" and peek_tok.token_type ~= "comment"
+     token_iter_state.line, token_iter_state.line_offset = line, line_offset
+@@ -1479,4 +1512,14 @@
+   return main, result_error_code_insts
+ end
+ 
+-return parse
++return function(...)
++  local result = table.pack(pcall(parse, ...))
++  -- Quota exceptions must release the same temporary roots as normal returns.
++  token, prev_token, token_iter_state = nil, nil, nil
++  source, prevent_assert, error_code_insts = nil, nil, nil
++  invalid_token_invalid_node_lut, err_pos_token, extra_node = nil, nil, nil
++  next_token, peek_token = nil, nil
++  parse_depth, max_parse_depth = nil, nil
++  if not result[1] then error(result[2], 0) end
++  return table.unpack(result, 2, result.n)
++end

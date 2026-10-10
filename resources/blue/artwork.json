@@ -1,0 +1,28 @@
+{
+  "format": 1,
+  "license": "LICENSE",
+  "license_sha256": "e1c0d17914a226a9d1ffe073b40ba7c4dafd3ec0d711eda11084d307429a77f8",
+  "transform": "colorchannelmixer=rr=0.135:rg=0.265:rb=0.05:gr=0.269:gg=0.528:gb=0.103:br=0.463:bg=0.91:bb=0.177:aa=1",
+  "files": [
+    {
+      "source": "graphics/entities/computer_hr.png",
+      "source_sha256": "bdddb9ec596d9f0a4ab96237b0de88021b8302391a9c4d1ccae55cf5314cf93d",
+      "path": "graphics/entities/blue-computer_hr.png",
+      "sha256": "327f8e2bae127ae2478f117c9a25dc7322ae741e145db7fb9c4699b626592fae",
+      "dimensions": [
+        1000,
+        800
+      ]
+    },
+    {
+      "source": "graphics/icons/computer-icon.png",
+      "source_sha256": "1c9474ce622eb3e6ec305a3b99e4900175d543cce48c9a6bcd0638860a7fc4ec",
+      "path": "graphics/icons/blue-computer-icon.png",
+      "sha256": "41d84ec14a45c155df84a4e49bdfe4893d81e53d30e9220a63c32dbd22653079",
+      "dimensions": [
+        32,
+        32
+      ]
+    }
+  ]
+}

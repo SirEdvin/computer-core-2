@@ -1,9 +1,9 @@
 {
   "name": "computer_core_2",
-  "version": "0.1.2",
+  "version": "0.3.0",
   "title": "Computer Core 2 (ALPHA)",
   "author": "SirEdvin; original Computer Core by Relik77 and contributors",
   "factorio_version": "2.0",
   "dependencies": ["base >= 2.0.77", "! computer_core"],
-  "description": "ALPHA - experimental Factorio 2.0 port of Computer Core. Programmable Lua computers, shell/filesystem, named persistent handlers, circuits, wireless networking and personal gauntlet. Fresh 2.0 worlds only; no legacy saves or persisted-closure compatibility. Headless base/expansion save-reload tests pass; client GUI, sound, wired robot blueprints and multiplayer acceptance remain unverified. Back up saves; expect bugs and API changes."
+  "description": "EXPERIMENTAL 0.3.0 ALPHA PLAYTEST - adds a blue, built-in-only event-driven shell computer alongside unchanged original/personal VM computers with Recrafted shell/editors. Blue files are data: no Lua scripts, editors or modules. Both models use existing computer research. No guest world/network APIs. Graphical input/rendering and multiplayer joins remain unverified. Back up saves, prefer a fresh test world and never downgrade a migrated save. Expect bugs and API changes."
 }

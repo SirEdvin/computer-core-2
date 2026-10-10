@@ -1,0 +1,19 @@
+--- src/nodes.lua
++++ vendor/phobos/nodes.lua
+@@ -1,6 +1,6 @@
+ 
+-local util = require("util")
+-local ill = require("indexed_linked_list")
++local util = require("__computer_core_2__.vendor.phobos.util")
++local ill = require("__computer_core_2__.vendor.phobos.indexed_linked_list")
+ 
+ local assert_params_field = util.assert_params_field
+ 
+@@ -20,6 +20,7 @@
+ 
+ ---@param node_type AstNodeType
+ local function new_node(node_type, position_token)
++  util.spend_work()
+   local node = {node_type = node_type}
+   if position_token then
+     nodes.set_position(node, position_token)

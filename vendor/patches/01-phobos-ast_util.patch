@@ -1,0 +1,79 @@
+--- src/ast_util.lua
++++ vendor/phobos/ast_util.lua
+@@ -1,8 +1,8 @@
+ 
+-local util = require("util")
+-local nodes = require("nodes")
+-local ill = require("indexed_linked_list")
+-local stack = require("stack")
++local util = require("__computer_core_2__.vendor.phobos.util")
++local nodes = require("__computer_core_2__.vendor.phobos.nodes")
++local ill = require("__computer_core_2__.vendor.phobos.indexed_linked_list")
++local stack = require("__computer_core_2__.vendor.phobos.stack")
+ 
+ local ast = {}
+ 
+@@ -21,6 +21,7 @@
+ ---@param name string
+ ---@return AstLocalDef
+ function ast.new_local_def(name, scope)
++  util.spend_work()
+   return {
+     def_type = "local",
+     name = name,
+@@ -45,6 +46,7 @@
+ end
+ 
+ function ast.create_upval_def(parent_def, target_scope)
++  util.spend_work()
+   local upval_def = {
+     def_type = "upval",
+     name = parent_def.name,
+@@ -56,6 +58,7 @@
+   parent_def.child_defs[#parent_def.child_defs+1] = upval_def
+   if upval_def.name == "_ENV" then
+     -- always put _ENV first so that `load`'s mangling will be correct
++    util.spend_work(#target_scope.upvals)
+     table.insert(target_scope.upvals, 1, upval_def)
+   else
+     target_scope.upvals[#target_scope.upvals+1] = upval_def
+@@ -68,6 +71,7 @@
+   ---@param name string
+   ---@return AstLocalDef|AstUpvalDef|nil
+   local function try_get_def(scope, stat_stack, name)
++    util.spend_work()
+     local current_stat
+     local in_scope_at_index
+     if stat_stack and not stack.is_empty(stat_stack) then
+@@ -80,6 +84,7 @@
+     local found_local_def
+     local found_start_index
+     for i = #scope.locals, 1, -1 do
++      util.spend_work()
+       local local_def = scope.locals[i]
+       if local_def.name == name then
+         if local_def.whole_block then
+@@ -101,6 +106,7 @@
+ 
+     if scope.node_type == "functiondef" then
+       for _, upval in ipairs(scope.upvals) do
++        util.spend_work()
+         if upval.name == name then
+           return upval
+         end
+@@ -179,6 +185,7 @@
+ 
+ local function get_or_create_upval_def(parent_def, target_scope)
+   for _, upval in ipairs(target_scope.upvals) do
++    util.spend_work()
+     if upval.parent_def == parent_def then
+       return upval
+     end
+@@ -189,6 +196,7 @@
+ function ast.create_ref_to(local_def, target_scope)
+   local function get_def_recursive(scope)
+     while scope ~= local_def.scope do
++      util.spend_work()
+       if scope.node_type == "functiondef" then
+         local def = get_def_recursive(scope.parent_scope)
+         return get_or_create_upval_def(def, scope)

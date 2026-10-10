@@ -1,0 +1,17 @@
+assert(string.format("%x/%02d/%s/%%", 15, 3, "leaf") == "f/03/leaf/%")
+assert(("[%5.2s]"):format("forest") == "[   fo]")
+local quoted = "a\n\"b"
+assert(assert(load("return " .. ("%q"):format(quoted)))() == quoted)
+assert(string.format("%.2f", 1.25) == "1.25")
+assert(string.format('%s/%5s/%.2s', false, true, nil) == 'false/ true/ni')
+assert(not pcall(string.format, '%q', false))
+assert(not pcall(string.format, "%1000000000s", "x"))
+assert(not pcall(string.format, "%.1000000000f", 1))
+assert(not pcall(string.format, "%s%s", string.rep("x", 65536), "y"))
+assert(not pcall(string.format, "%s", {}))
+assert(not pcall(string.format, "%p", {}))
+assert(not pcall(string.format, "dangling %"))
+assert(not pcall(string.format, "%" .. string.rep("0", 4000) .. "z", "x"))
+assert(not pcall(string.format, "%" .. string.rep("1", 4000) .. "z", "x"))
+assert(not pcall(string.format, string.rep("%s", 3000), "x"))
+return "format-pass"
