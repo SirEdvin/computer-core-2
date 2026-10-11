@@ -8,7 +8,7 @@ for _,key in ipairs({
   {'tab','TAB',258}, {'backspace','BACKSPACE',259}, {'delete','DELETE',261},
   {'left','LEFT',263}, {'right','RIGHT',262}, {'up','UP',265}, {'down','DOWN',264},
   {'home','HOME',268}, {'end','END',269}, {'page-up','PAGEUP',266}, {'page-down','PAGEDOWN',267},
-  {'menu','CONTROL + M',341}
+  {'menu','CONTROL + M',341}, {'save','CONTROL + S',501}, {'quit','CONTROL + Q',502}
 }) do
   M.bindings[#M.bindings+1]={name='cc2-terminal-'..key[1],sequence=key[2],code=key[3]}
 end

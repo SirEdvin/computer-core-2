@@ -1,9 +1,16 @@
 {
   "format": 1,
   "backend": "event-shell",
-  "execution": "trusted-built-ins-only",
+  "execution": "trusted-built-ins-and-validated-native-event-scripts",
   "rom_adaptations": [],
   "files": [
+    {
+      "path": "resources/programs/stock-controller.lua",
+      "sha256": "542a400c353da4edc5055972a1026abd4370095bd850ea1d3b2eeed5ebcb0b6d",
+      "license": "MIT",
+      "license_path": "LICENSE",
+      "origin": "project-authored"
+    },
     {
       "path": "scripts/filesystem.lua",
       "sha256": "0dd0b10ce823dd47fc7e70aff0fa374197ec36badd57d158eda5e527268e2965",
@@ -33,6 +40,34 @@
       "origin": "shared-project-module"
     },
     {
+      "path": "scripts/programs/circuit.lua",
+      "sha256": "a2deed6b907510a9475e8be3e0dbb0042206d548e9f5db4e0f6784c122d531b5",
+      "license": "MIT",
+      "license_path": "LICENSE",
+      "origin": "project-authored"
+    },
+    {
+      "path": "scripts/programs/compiler.lua",
+      "sha256": "7e35d6c9d5bc1670d1c2c1a5a790927f9caa6914e32b97585f214bb92baaf88e",
+      "license": "MIT",
+      "license_path": "LICENSE",
+      "origin": "project-authored"
+    },
+    {
+      "path": "scripts/programs/editor.lua",
+      "sha256": "05ea56a8e7ebf5c359c727849b42a43fe0414521bff8e1979763149131b7fd52",
+      "license": "MIT",
+      "license_path": "LICENSE",
+      "origin": "project-authored"
+    },
+    {
+      "path": "scripts/programs/runtime.lua",
+      "sha256": "941e5866f4c640a892d272d246a1aff041fde788dcba3bfbfeb4b963492fc4f1",
+      "license": "MIT",
+      "license_path": "LICENSE",
+      "origin": "project-authored"
+    },
+    {
       "path": "scripts/shell/budget.lua",
       "sha256": "10bc50051494f94d651efac87c3219982d92ef26f0d7bd5115a0a618150528d4",
       "license": "MIT",
@@ -41,14 +76,14 @@
     },
     {
       "path": "scripts/shell/directory.lua",
-      "sha256": "2435b4287059274b2fbfa21d1670ce1fb7c6edc26403a1b7900a7568a54dc58f",
+      "sha256": "78a98cef8edf9370f3c7d8ab6827816e56c1e66ddced3868ffaf91a50e4586a1",
       "license": "MIT",
       "license_path": "LICENSE",
       "origin": "project-authored"
     },
     {
       "path": "scripts/shell/file_job.lua",
-      "sha256": "44d03285157c8909a437bea693aa79fca51327cc2a36165047e72b088f4f2734",
+      "sha256": "c743b8bb3d93a5a9baf20f001fbab5942dd6d3973b296f4443fa3bea2dbc4fc0",
       "license": "MIT",
       "license_path": "LICENSE",
       "origin": "project-authored"
@@ -69,21 +104,21 @@
     },
     {
       "path": "scripts/shell/resources.lua",
-      "sha256": "864d38ffa981ec9dde8422ab66c8c6e5d024b087641d47244178fa7b08929995",
+      "sha256": "eb53752da32ecfcbf17336f0d0a52c4e26c1d45f4c59ccb6a71e6130e2c63192",
       "license": "MIT",
       "license_path": "LICENSE",
       "origin": "project-authored"
     },
     {
       "path": "scripts/shell/runtime.lua",
-      "sha256": "4afa41083e177f446ee62a0525260932c66f943fdbecc2ff5a481b1df05cecb8",
+      "sha256": "2ac65f8985745889c2ebe6483436a6e5e1db2bc4a5fd161dc91eb1bb3cf7ccdb",
       "license": "MIT",
       "license_path": "LICENSE",
       "origin": "project-authored"
     },
     {
       "path": "scripts/shell/scheduler.lua",
-      "sha256": "208ab88d79b9f1effde8e0b4b3cf00eb0e0cf4fcf3fc6577793b7c4a35206633",
+      "sha256": "e4cf983f3d09b6692edbf7636f15846e1e6458fd9b63a5adffd4bb6884692aa3",
       "license": "MIT",
       "license_path": "LICENSE",
       "origin": "project-authored"

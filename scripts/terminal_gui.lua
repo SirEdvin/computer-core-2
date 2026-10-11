@@ -145,11 +145,11 @@ function M.open(player,c)
   local frame=player.gui.screen.add{type='frame',name='cc2_root',direction='vertical',caption=c.personal and 'Personal terminal' or (shell and 'Shell computer ' or 'Computer ')..c.id}
   frame.auto_center=true
   local bar=frame.add{type='flow',name='cc2_bar',direction='horizontal'}
-  bar.add{type='button',name='cc2_reboot',caption='Reboot',tooltip=shell and 'Restart the shell and clear pending work/input. Committed files remain.' or 'Restart execution. Unsaved guest editor buffers will be lost; saved files remain.'}
+  bar.add{type='button',name='cc2_reboot',caption='Reboot',tooltip=shell and 'Restart the shell. A dirty native editor asks save/discard/cancel first; committed files remain.' or 'Restart execution. Unsaved guest editor buffers will be lost; saved files remain.'}
   bar.add{type='button',name='cc2_shutdown',caption='Shutdown',tooltip='Pause this computer until Reboot. Closing the window does not stop it.'}
   bar.add{type='button',name='cc2_terminate',caption='Terminate',tooltip=shell and 'Cancel foreground work. Committed files remain.' or 'Send termination to the guest program.'}
   bar.add{type='button',name='cc2_close',caption='Close'}
-  frame.add{type='label',name='cc2_status',caption='Booting…',style='cc2_status',tooltip=shell and 'Built-in commands only. Click the terminal to type or paste; Enter submits.' or 'Click the terminal to type or paste. Enter submits; Ctrl+M opens the editor menu.'}
+  frame.add{type='label',name='cc2_status',caption='Booting…',style='cc2_status',tooltip=shell and 'Click to type/paste. edit PATH: Enter inserts a newline; Ctrl+S saves, Ctrl+Q exits. Dirty exit: s/d/c.' or 'Click the terminal to type or paste. Enter submits; Ctrl+M opens the editor menu.'}
   if c.migration_notice then
     frame.add{type='label',caption='Alpha upgrade: old callbacks retired. Files/drafts retained; see /legacy-recovery and /legacy-startup*. Back up your save.',style='cc2_status'}.style.maximal_width=600
   end
@@ -188,6 +188,7 @@ function M.key(event,code)
   if not player then return end
   local c,session,frame=current(player)
   if not c or not frame or player.opened~=frame then return end
+  if code>=501 and R.backend(c)~='event-shell' then return end
   -- CustomInputEvent.element/in_gui describe mouse hover, not keyboard focus.
   -- The opened terminal and current authorization determine keyboard routing.
   tap(player,c,session,code)

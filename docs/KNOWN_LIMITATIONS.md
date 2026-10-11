@@ -1,15 +1,20 @@
-# Known limitations — 0.3.0 alpha
+# Known limitations — 0.4.0 alpha
 
 This is an experimental, breaking terminal-OS playtest, **not full CraftOS** and
 not a stable release. This document does not certify completed source integration,
 a published archive, migration acceptance or graphical/multiplayer acceptance.
 Follow [PLAYTEST.md](PLAYTEST.md) on a fresh world or backed-up save copy.
 
+The 0.4.0 alpha adds native `edit`, restricted source execution
+and owned circuit automation; see [BLUE_AUTOMATION.md](BLUE_AUTOMATION.md) for
+its exact restrictions and evidence boundaries. It is not a general Lua OS and
+does not close graphical or real joining-peer acceptance.
+
 ## Compatibility boundary
 
-- The new blue model is a built-in-only event shell. It cannot run Lua source,
-  editors, modules or the Recrafted OS. Its local files are data; `/rom/help.txt`
-  is read-only data, not executable ROM. Original/personal VM computers retain
+- The blue model has a native editor and executes only validated, restricted
+  event-driven Lua source. It cannot run arbitrary Lua, user modules or the
+  Recrafted OS. `/rom/help.txt` is read-only data. Original/personal VM computers retain
   the source-program/editor behavior described below. The blue model is released
   for explicitly authorized alpha testing; graphical and joining-peer acceptance
   remain blocking and are not inferred from the packaged headless tests.

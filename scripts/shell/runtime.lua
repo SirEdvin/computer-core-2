@@ -7,8 +7,11 @@ local Import = require('__computer_core_2__.scripts.shell.import')
 local Parser = require('__computer_core_2__.scripts.shell.parser')
 local Directory = require('__computer_core_2__.scripts.shell.directory')
 local FileJob = require('__computer_core_2__.scripts.shell.file_job')
+local Editor = require('__computer_core_2__.scripts.programs.editor')
+local Programs = require('__computer_core_2__.scripts.programs.runtime')
+local ProgramCompiler = require('__computer_core_2__.scripts.programs.compiler')
 local M = {VERSION = 2, BACKEND = 'event-shell', command_bytes = 8192, history_count = 32, history_bytes = 32768, output_chunk = 128}
-local command_names={'cat','cd','clear','cp','help','ls','mkdir','mv','pwd','reboot','rm','shutdown'}
+local command_names={'cat','cd','clear','cp','edit','help','ls','mkdir','mv','ps','pwd','reboot','rm','run','shutdown','stop'}
 local T = Terminal.methods
 local handlers, commands = {}, {}
 local function integer(n, low, high)
@@ -60,7 +63,7 @@ commands.pwd=function(state,args)
   output(state,args=='' and state.disk.cwd..'\n' or 'pwd: no arguments accepted\n')
 end
 commands.help=function(state,args)
-  output(state,args=='' and 'Built-ins: help, pwd, cd PATH, ls [PATH], cat PATH, mkdir PATH, cp SRC DST, mv SRC DST, rm PATH, clear, reboot, shutdown. No overwrite. rm is recursive; root/current-dir ancestors and /rom are protected. Quote/escape paths. Tab completes. Files are data: no scripts, modules, editors, pipes or substitutions.\n'
+  output(state,args=='' and 'Built-ins: help, pwd, cd PATH, ls [PATH], cat PATH, edit PATH, run PATH (or PATH.lua), ps, stop, mkdir PATH, cp SRC DST, mv SRC DST, rm PATH, clear, reboot, shutdown. edit: 32 KiB native document; Ctrl+S saves, Ctrl+Q exits with s save / d discard / c cancel. Save replaces only an unchanged base file. run: 16 KiB finite Lua return descriptor with on_start/on_tick; no loops, recursion, modules or unrestricted globals. One background controller; stop before replace. circuit.read(side,wire,type,name), circuit.write(side,type,name,count), circuit.clear(side): owned left/right ports, normal quality only. Copy /rom/examples/stock-controller.lua locally; wire read-enabled chest to left and signal-A > 0 inserter to right on separate networks. cp/mv refuse overwrite. /rom is read-only. Quote/escape paths. Tab completes.\n'
     or 'help: no arguments accepted\n')
 end
 local function path_argument(args)
@@ -68,6 +71,10 @@ local function path_argument(args)
   assert(values[1]~='','path argument required')
   return values[1]
 end
+commands.edit=function(state,args) Editor.open(state,path_argument(args)) end
+commands.run=function(state,args) state.job=Programs.job(state,path_argument(args)); T.setCursorBlink(state.display,false) end
+commands.ps=function(state,args) assert(args=='','ps: no arguments accepted'); output(state,Programs.describe(state)) end
+commands.stop=function(state,args,services) assert(args=='','stop: no arguments accepted'); Programs.stop(state,services) end
 commands.cd=function(state,args)
   local path=Filesystem.path(state.disk,path_argument(args))
   local node=Directory.get(state.disk,path)
@@ -94,28 +101,35 @@ for _,operation in ipairs({'mkdir','cp','mv','rm'}) do
     state.job=FileJob.new(state,op,values); T.setCursorBlink(state.display,false)
   end
 end
-local function reset_session(state,status)
+local function reset_session(state,status,services)
+  Programs.stop(state,services)
   local tick=state.events.tick
   state.events=Events.new(); state.events.tick=tick
   state.job=nil; state.command,state.cursor='',0; state.history={}; state.history_index=1
   state.history_draft,state.history_draft_cursor=nil,nil; state.error=nil; state.status=status
   T.clear(state.display); T.setCursorPos(state.display,1,1); T.setCursorBlink(state.display,false)
 end
-commands.reboot=function(state,args)
+commands.reboot=function(state,args,services)
   assert(args=='','reboot: no arguments accepted')
-  reset_session(state,'boot'); T.write(state.display,('Rebooting...'):sub(1,state.display.columns))
+  reset_session(state,'boot',services); T.write(state.display,('Rebooting...'):sub(1,state.display.columns))
 end
-commands.shutdown=function(state,args)
+commands.shutdown=function(state,args,services)
   assert(args=='','shutdown: no arguments accepted')
-  reset_session(state,'stopped'); T.write(state.display,('Stopped'):sub(1,state.display.columns))
+  reset_session(state,'stopped',services); T.write(state.display,('Stopped'):sub(1,state.display.columns))
 end
-handlers.reboot=function(state) commands.reboot(state,'') end
-handlers.shutdown=function(state) commands.shutdown(state,'') end
+handlers.reboot=function(state,event,services) commands.reboot(state,'',services) end
+handlers.shutdown=function(state,event,services) commands.shutdown(state,'',services) end
+local function editor_finished(state,action,services)
+  if not action then return end
+  if action=='reboot' or action=='shutdown' then commands[action](state,'',services)
+  else T.clear(state.display); prompt(state) end
+end
 local function valid_job(job)
   if job==nil then return true end
   if plain(job) and job.kind=='import' then return Import.valid(job) end
   if plain(job) and (job.kind=='listing' or job.kind=='completion') then return Directory.valid(job) end
   if plain(job) and job.kind=='filesystem' then return FileJob.valid(job) end
+  if plain(job) and job.kind=='program' then return Programs.valid_job(job) end
   if not plain(job) then return false end
   local count=0
   for key in pairs(job) do
@@ -147,6 +161,10 @@ local function valid_state(state)
     and integer(state.display.columns,1,Terminal.max_columns) and integer(state.display.rows,1,Terminal.max_rows)
     and type(state.command)=='string' and #state.command<=M.command_bytes and integer(state.cursor,0,#state.command)
     and history_size(state.history)~=nil and valid_job(state.job)
+    and (state.controller==nil or Programs.valid(state.controller))
+    and (state.program_output==nil or Programs.valid_output(state.program_output))
+    and (state.editor==nil or Editor.valid(state.editor) and (not state.editor.saving
+      or state.job and state.job.kind=='filesystem' and state.job.op=='write'))
     and (not state.job or state.job.kind~='import' or state.status=='initializing' or state.status=='recovery')
     and integer(state.history_index,1,#state.history+1)
     and (state.history_draft==nil or type(state.history_draft)=='string' and #state.history_draft<=M.command_bytes
@@ -215,7 +233,7 @@ local function command_parts(text)
   while finish<=last and space(finish) do finish=finish+1 end
   return name,text:sub(finish,last),false
 end
-handlers.key=function(state,event)
+handlers.key=function(state,event,services)
   if state.status~='ready' or state.job then return end
   local key=event[2]
   if key==257 then
@@ -236,9 +254,15 @@ handlers.key=function(state,event)
     T.setCursorPos(state.display,1,state.display.rows)
     local fn=name and commands[name]
     if fn then
-      local ok,err=pcall(fn,state,args)
+      local ok,err=pcall(fn,state,args,services)
       if not ok then output(state,tostring(err):sub(1,M.command_bytes)..'\n') end
-    else output(state,'unsupported command; built-ins only\n') end
+    else
+      local values=Parser.arguments(command,1)
+      if values and values[1] and values[1]:sub(-4)=='.lua' then
+        local ok,err=pcall(function() state.job=Programs.job(state,values[1]); T.setCursorBlink(state.display,false) end)
+        if not ok then output(state,tostring(err):sub(1,M.command_bytes)..'\n') end
+      else output(state,'unsupported command; built-ins and restricted local .lua files only\n') end
+    end
   elseif key==258 then
     local ok,job=pcall(Directory.new,state,'completion',nil,command_names)
     if ok then state.job=job; T.setCursorBlink(state.display,false) else state.error=tostring(job):sub(1,1024) end
@@ -263,7 +287,7 @@ handlers.key=function(state,event)
     state.cursor=state.cursor-1
   elseif key==261 then state.command=state.command:sub(1,state.cursor)..state.command:sub(state.cursor+2)
   end
-  if not state.job and state.status=='ready' then prompt(state) end
+  if not state.job and not state.editor and state.status=='ready' then prompt(state) end
 end
 -- Preview only the fixed 128-byte window, counting actual writes and scrolls.
 local function output_work(state)
@@ -282,13 +306,33 @@ local function output_work(state)
   end
   return count,cost
 end
-handlers.advance=function(state)
+handlers.advance=function(state,event,services)
   local job=state.job
-  if not job or state.status~='ready' then return end
+  if state.status~='ready' then return end
+  if not job then
+    if not state.editor then local text=Programs.take_print(state); if text then output(state,text..'\n') end end
+    return
+  end
+  if job.kind=='program' then
+    local ok,err=Programs.activate(state,job,state.events.tick,services)
+    if not ok then output(state,err..'\n') else state.job=nil; prompt(state) end
+    return
+  end
   if job.kind=='filesystem' then
-    local ok,disk=pcall(FileJob.advance,job)
-    if not ok then output(state,tostring(disk):sub(1,1024)..'\n'); return end
-    if disk then state.disk=disk; state.job=nil; prompt(state) end
+    local ok,disk=pcall(FileJob.advance,job,state.disk)
+    if not ok then
+      if state.editor and state.editor.saving then
+        state.job=nil; Editor.failed(state,disk); Editor.render(state)
+      else output(state,tostring(disk):sub(1,1024)..'\n') end
+      return
+    end
+    if disk then
+      state.disk=disk; state.job=nil
+      if state.editor then
+        editor_finished(state,Editor.published(state),services)
+        if state.editor then Editor.render(state) end
+      else prompt(state) end
+    end
     return
   end
   if job.kind=='listing' or job.kind=='completion' then assert(Directory.audit(job),'malformed directory records') end
@@ -343,7 +387,7 @@ handlers.term_resize=function(state,event)
     T.setCursorPos(state.display,math.max(1,math.min(state.display.x,state.display.columns)),state.display.rows)
   else prompt(state) end
 end
-function M.handle(state,event,admit)
+function M.handle(state,event,admit,services)
   assert(type(admit)=='function','shell requires host work admission')
   if not plain(state) then return false,'invalid shell state' end
   if not valid_state(state) then return halt(state,'incompatible or malformed event-shell state',admit) end
@@ -380,7 +424,9 @@ function M.handle(state,event,admit)
     end
   end
   if name=='advance' and state.job then
-    if state.job.kind=='filesystem' then
+    if state.job.kind=='program' then
+      for domain,amount in pairs(ProgramCompiler.work()) do cost[domain]=(cost[domain] or 0)+amount end
+    elseif state.job.kind=='filesystem' then
       for domain,amount in pairs(FileJob.work(state.job)) do cost[domain]=(cost[domain] or 0)+amount end
     elseif (state.job.kind=='listing' or state.job.kind=='completion') and state.job.phase~='output' then
       for domain,amount in pairs(Directory.work(state.job)) do cost[domain]=(cost[domain] or 0)+amount end
@@ -396,13 +442,25 @@ function M.handle(state,event,admit)
     cost.terminal=cost.terminal+1+6*event[2]*event[3]+6*d.columns*d.rows+2*event[3]
       +4+1+3*event[2]+1+11*event[2]
   end
+  if state.editor or name=='key' and event[2]==257 then
+    local geometry=name=='term_resize' and {columns=event[2],rows=event[3]} or d
+    local render=not state.editor or name=='advance'
+    for domain,amount in pairs(Editor.work(geometry,render)) do cost[domain]=(cost[domain] or 0)+amount end
+  end
+  if name=='advance' and not state.job and state.program_output then
+    cost.table=(cost.table or 0)+1024; cost.event=cost.event+256; cost.string=cost.string+512
+  end
   if not admit(cost) then return false,'work deferred' end
   if name=='advance' and state.job and state.job.kind=='filesystem' and not FileJob.audit(state.job) then
     state.recovery={message='Malformed retained filesystem data',previous_status=state.status}
     state.status='recovery'; state.instructions=state.instructions+cost.execution
     return false,state.recovery.message
   end
-  local ok,err=pcall(handlers[name],state,event)
+  local ok,err=pcall(function()
+    if state.editor and name~='advance' and name~='boot' and name~='timer' then
+      editor_finished(state,Editor.handle(state,event),services)
+    else handlers[name](state,event,services) end
+  end)
   if not ok then
     state.recovery={message=tostring(err):sub(1,1024),previous_status=state.status}
     state.status='recovery'

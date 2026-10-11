@@ -2,7 +2,9 @@
 local FS=require('__computer_core_2__.scripts.filesystem')
 local Parser=require('__computer_core_2__.scripts.shell.parser')
 local Resources=require('__computer_core_2__.scripts.shell.resources')
-local M={VERSION=1,batch=8,sort_batch=64,max_entries=FS.max_nodes+2}
+local resource_count=0
+for _ in pairs(Resources) do resource_count=resource_count+1 end
+local M={VERSION=1,batch=8,sort_batch=64,max_entries=FS.max_nodes+resource_count,resource_count=resource_count}
 function M.readonly(path) return path=='/rom' or path:sub(1,5)=='/rom/' end
 function M.get(disk,path) return Resources[path] or disk.fs[path] end
 local function keys(disk)

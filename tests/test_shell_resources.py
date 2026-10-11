@@ -26,10 +26,11 @@ class ShellResourceTests(unittest.TestCase):
 
     def test_deterministic_closed_source_inventory(self):
         self.assertEqual(render(self.root), render(self.root))
-        self.assertEqual(verify(self.root), {'shell_sources': 8, 'shell_shared_modules': 5, 'shell_rom_adaptations': 0})
+        self.assertEqual(verify(self.root), {'shell_sources': 8, 'native_application_sources': 4, 'native_example_sources': 1,
+                                           'shell_shared_modules': 5, 'shell_rom_adaptations': 0})
         manifest = json.loads(render(self.root))
         self.assertEqual(manifest['backend'], 'event-shell')
-        self.assertEqual(manifest['execution'], 'trusted-built-ins-only')
+        self.assertEqual(manifest['execution'], 'trusted-built-ins-and-validated-native-event-scripts')
         self.assertEqual(manifest['rom_adaptations'], [])
         self.assertEqual(len({r['path'] for r in manifest['files']}), len(manifest['files']))
 

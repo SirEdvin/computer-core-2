@@ -1,6 +1,6 @@
-# 0.3.0 alpha playtest
+# 0.4.0 alpha playtest
 
-Experimental terminal-OS playtest guidance for the **0.3.0 alpha** build;
+Experimental terminal-OS playtest guidance for the **0.4.0 alpha** build;
 not a publication announcement or stable acceptance claim. Graphical/client tests
 below belong to the playtester and are **not yet passed**. See
 [known limitations](KNOWN_LIMITATIONS.md) before upgrading.
@@ -10,7 +10,7 @@ below belong to the playtester and are **not yet passed**. See
 1. **Back up your saves and keep an untouched copy.** Prefer a fresh test world;
    upgrade only a separate copy of an existing Computer Core 2 save.
 2. Use Factorio **2.0.77 or newer**. Copy the supplied
-   `computer_core_2_0.3.0.zip` into Factorio's `mods` directory and enable Computer
+   `computer_core_2_0.4.0.zip` into Factorio's `mods` directory and enable Computer
    Core 2. Do not enable the original `computer_core` alongside it. Ensure all
    multiplayer clients have the same mod version and startup settings.
 3. Verify the archive/version supplied by the maintainer; this document does not
@@ -135,3 +135,29 @@ not native client acceptance. Leave these boxes unchecked until genuinely tested
 Record exact archive hash, Factorio version, startup geometry, UI scale, event/job
 state and reproducible steps. Keep screenshots/logs outside the repository. Real
 graphical latency and multiplayer joining remain blocking acceptance gates.
+
+## 0.4.0 native editor/controller alpha
+
+Use the checksum-identified 0.4.0 archive with
+[BLUE_AUTOMATION.md](BLUE_AUTOMATION.md), not the shell-only released ZIP.
+Follow its chest/feeder/inserter layout with separate left/right red networks.
+All boxes below remain unchecked until tested with actual clients.
+
+- [ ] Copy the stock example locally; edit its threshold from 100 to 5 using
+      keyboard navigation/paste. Ctrl+S must preserve the dirty draft until
+      publication; Ctrl+Q must return to the prompt only after the chosen action.
+- [ ] Confirm Enter inserts a newline, middle paste preserves its suffix,
+      Backspace/Delete and viewport/navigation/resize work without focus theft.
+      No second visible editor widget or duplicate navigation controls appears.
+- [ ] Dirty exit, Terminate, Reboot and Shutdown offer save/discard/cancel.
+      Cancel keeps draft/controller; a refused save retains editable text.
+      Close/reopen and a saved-world reload preserve cursor/viewport/dirty state.
+- [ ] Run the edited file, inspect ps and verify actual transfer below five
+      plates and stable stopping at five. Let a held item complete its drop.
+      Stop clears only private outputs; unrelated circuit sections survive.
+- [ ] Cut power, restore it with changed stock, then save/reload. No start replay
+      or stale signal-A appears before a fresh evaluation. Record true rendered
+      responsiveness beside an original VM computer, not model-tick latency.
+- [ ] A real second client joins during dirty editing, exhausted callback credits
+      and pending input/save work. Compare source/state/draft/deadline/work and
+      owned wires; verify no on_load effects and exactly-once subsequent commits.

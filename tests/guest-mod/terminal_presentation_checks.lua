@@ -184,7 +184,9 @@ return function(check)
     local second={index=2,valid=true,character={valid=true},gui={screen=element({})},force=force,surface=surface,position={x=0,y=0},
       display_scale=1,display_resolution={width=1920,height=1080}}
     players[2]=second
-    local peer={id=2,personal=true,player_index=2,guest=VM.new(assert(Compiler.compile('return true')))}
+    local peer={id=2,personal=true,player_index=2,guest=VM.new(assert(Compiler.compile('os.pullEvent("char")')))}
+    VM.run(peer.guest,4096)
+    check('mock personal VM neighbor retains an actually suspended guest stack',peer.guest.objects[peer.guest.main.ref].status=='waiting')
     storage.computers[2]=peer
     assert(GUI.open(second,peer))
     local peer_queue=#peer.guest.events.queue
@@ -192,6 +194,7 @@ return function(check)
     GUI.key({player_index=2},263)
     check('mock simultaneous shell and VM viewers use independent event protocols',shell.cursor==0 and #peer.guest.events.queue==peer_queue+2
       and peer.guest.events.queue[peer_queue+2].tuple[1]=='key_up' and #vm.events.queue==queued)
+    local peer_before=serpent.line(peer.guest,{sortkeys=true})
     computer.entity.electric_buffer_size=5000000; computer.entity.energy=0
     saved=serpent.line(shell,{sortkeys=true})
     click(frame.cc2_bar.cc2_reboot)
@@ -228,6 +231,36 @@ return function(check)
     saved=serpent.line(shell,{sortkeys=true})
     GUI.close(player); assert(GUI.open(player,computer))
     check('mock shell reopen preserves complete session and leaves VM viewer open',serpent.line(shell,{sortkeys=true})==saved and storage.sessions[2].id==2)
+    frame=screen.cc2_root; capture=frame.cc2_capture
+    capture.text='edit /draft.lua'
+    GUI.event{player_index=1,name=defines.events.on_gui_text_changed,element=capture}
+    GUI.event{player_index=1,name=defines.events.on_gui_confirmed,element=capture}
+    assert(step()); assert(step()); local editor=assert(shell.editor)
+    capture.text='first line\nsecond line'
+    GUI.event{player_index=1,name=defines.events.on_gui_text_changed,element=capture}; assert(step())
+    GUI.key({player_index=1},263); assert(step())
+    saved=serpent.line(shell,{sortkeys=true}); local cursor=editor.cursor
+    GUI.close(player); assert(GUI.open(player,computer)); frame=screen.cc2_root; capture=frame.cc2_capture
+    check('mock native editor close/reopen preserves exact dirty draft cursor viewport and VM neighbor',shell.editor==editor
+      and editor.dirty and editor.cursor==cursor and serpent.line(shell,{sortkeys=true})==saved and storage.sessions[2].id==2)
+    click(frame.cc2_bar.cc2_reboot); assert(step())
+    check('mock GUI reboot requests dirty native disposition instead of discarding',shell.editor==editor and editor.confirm and editor.disposition=='reboot')
+    capture.text='c'; GUI.event{player_index=1,name=defines.events.on_gui_text_changed,element=capture}; assert(step())
+    check('mock GUI dirty reboot cancel retains document and committed disk',shell.editor==editor and not editor.confirm and shell.disk==disk and not disk.fs['/draft.lua'])
+    click(frame.cc2_bar.cc2_shutdown); assert(step())
+    capture.text='c'; GUI.event{player_index=1,name=defines.events.on_gui_text_changed,element=capture}; assert(step())
+    check('mock GUI dirty shutdown cancel retains ready editor and VM events',shell.editor==editor and not editor.confirm and shell.status=='ready' and #peer.guest.events.queue==peer_queue+2)
+    local draft=editor.text
+    GUI.key({player_index=1},501); assert(step())
+    check('mock native save shortcut stages atomic write while draft stays dirty',editor.saving and editor.dirty and shell.job.op=='write' and not shell.disk.fs['/draft.lua'])
+    while shell.job do assert(step()) end
+    check('mock GUI native save publishes exact multiline source before marking clean',shell.editor==editor and not editor.dirty and shell.disk.fs['/draft.lua'].text==draft)
+    GUI.key({player_index=1},502); assert(step())
+    check('mock native quit shortcut returns shell without legacy VM input',shell.editor==nil and shell.status=='ready' and #peer.guest.events.queue==peer_queue+2)
+    local captures=0
+    for _,child in ipairs(frame.children) do if child.name=='cc2_capture' then captures=captures+1 end end
+    check('mock native editing adds no duplicate capture widget',captures==1)
+    check('mock native edit save lifecycle and close preserve suspended personal VM graph',serpent.line(peer.guest,{sortkeys=true})==peer_before)
     GUI.close(player); GUI.close(second)
   end)
   game,storage=real_game,real_storage

@@ -2,6 +2,7 @@ local Shell=require('__computer_core_2__.scripts.shell.runtime')
 local Scheduler=require('__computer_core_2__.scripts.shell.scheduler')
 local Budget=require('__computer_core_2__.scripts.shell.budget')
 local FS=require('__computer_core_2__.scripts.filesystem')
+local Resources=require('__computer_core_2__.scripts.shell.resources')
 local new=require('construct')
 local M={}
 local function packed(s) return serpent.line(s,{sortkeys=true}) end
@@ -34,7 +35,7 @@ function M.initial(check)
   for _,line in ipairs({'rm /','rm /rom','mkdir /rom/private','mv /rom/help.txt /help'}) do
     before=packed(s.disk); d.command(line); check('protected mutation refuses '..line,s.job.kind=='output' and packed(s.disk)==before); d.drain()
   end
-  d.command('cp /rom/help.txt /help'); d.drain(); check('copy can read resource without mutating it',s.disk.fs['/help'].text:find('trusted built-in',1,true) and not s.disk.fs['/rom'])
+  d.command('cp /rom/help.txt /help'); d.drain(); check('copy can read resource without mutating it',s.disk.fs['/help'].text==Resources['/rom/help.txt'].text and not s.disk.fs['/rom'])
   committed=s.disk; d.command('cp source canceled'); d.step()
   assert(s.job.phase=='prepare' and next(s.job.nodes))
   d.send({n=1,'terminate'}); check('interrupt discards unpublished file changes and restores prompt',s.job==nil and s.disk==committed and not s.disk.fs['/canceled'] and s.display.blink)

@@ -24,6 +24,14 @@ class FixtureModeTests(unittest.TestCase):
     def test_direct_shell_has_an_independent_fixture(self):
         self.assertEqual(fixture_mode('shell'), ('tests/shell-mod', 'CC2 SHELL', 120, 60))
 
+    def test_released_blue_upgrade_is_a_distinct_three_process_fixture(self):
+        self.assertEqual(fixture_mode('blue-upgrade'), ('tests/blue-upgrade-mod', 'CC2 BLUE UPGRADE', 2000, 120))
+        for arguments in [['--blue-upgrade'], ['--shell', '--baseline-archive', 'old.zip']]:
+            with patch('sys.argv', ['run_engine.py', *arguments]), patch('sys.stderr', new_callable=io.StringIO):
+                with self.assertRaises(SystemExit) as stopped:
+                    main()
+            self.assertEqual(stopped.exception.code, 2)
+
     def test_configuration_change_requires_the_shell_fixture_before_engine_execution(self):
         with patch('sys.argv', ['run_engine.py', '--guest', '--shell-config-change']), patch('sys.stderr', new_callable=io.StringIO) as error:
             with self.assertRaises(SystemExit) as stopped:

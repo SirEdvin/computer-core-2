@@ -1,8 +1,9 @@
-# Computer Core 2 — experimental 0.3.0 alpha
+# Computer Core 2 — experimental 0.4.0 alpha
 
 A terminal-only computer mod for Factorio 2.0.77+. Original/personal computers use
 a pinned Recrafted BIOS, shell and editors inside a durable guest VM. A new blue
-physical computer uses a trusted, built-in-only event-driven shell. Original artwork is retained.
+physical computer uses a trusted event-driven shell, native editor and restricted
+Lua automation with owned circuit ports. Original artwork is retained.
 This is an explicitly experimental playtest, not stable or full CraftOS compatibility.
 
 **Back up saves. Prefer a fresh world or a separate upgraded-save copy. Never
@@ -11,7 +12,7 @@ are still unverified and belong to the playtester.**
 
 ## Install and use
 
-1. Copy the supplied `computer_core_2_0.3.0.zip` into Factorio's `mods` directory.
+1. Copy the supplied `computer_core_2_0.4.0.zip` into Factorio's `mods` directory.
    Do not enable the original `computer_core` simultaneously.
 2. Research Personal Computer, then Computer. Supply power to a placed computer.
 3. Stay within ten tiles and Ctrl+left-click its body, or Ctrl+G for the private
@@ -48,6 +49,20 @@ historical, not instructions for this OS. Current guest contracts are documented
 and [guest runtime](docs/GUEST_RUNTIME.md). Guides/examples remain repository-only.
 
 ## Build and verify
+
+### 0.4.0 native editing and restricted automation alpha
+
+The 0.4.0 alpha adds native `edit`, restricted event-script `run`,
+`ps`/`stop`, owned circuit ports and an editable stock-control example. It does
+not support arbitrary Lua, a REPL or VM fallback. Follow
+[the blue automation guide](docs/BLUE_AUTOMATION.md) for exact controls, language,
+limits and wiring. Copy `/rom/examples/stock-controller.lua` to `/stock.lua`,
+edit and save it with Ctrl+S, leave with Ctrl+Q, then `run /stock.lua`.
+The 0.3.0 description below is historical. Graphical/multiplayer acceptance
+remains incomplete. Use `python3 tests/run_engine.py --programs` and repeat with
+`--expansion`; `--archive <zip>` exercises an exact candidate package.
+
+### Historical 0.3.0 shell-only alpha
 
 The 0.3.0 alpha adds **Blue computer (shell only)**, unlocked by the same Computer
 research. Craft the blue item, place/power it and Ctrl+left-click within ten tiles.
