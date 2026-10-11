@@ -162,6 +162,62 @@ local function context(prints,banks,controller,services,effects)
   end
   return a
 end
+function M.open_repl(state,tick,services)
+  assert(not state.controller or state.controller.status=='stopped','stop the current controller before lua')
+  local generation=state.controller and state.controller.generation+1 or 1
+  assert(generation<=9007199254740991,'program generation exhausted')
+  state.controller={version=M.VERSION,compiler=Compiler.VERSION,api=Compiler.API,path='=lua',source='',state={},
+    generation=generation,status='running',interval=1,next_tick=tick,started=true,
+    owner=services and services.identity() or nil,outputs={left={},right={}}}
+  state.repl={version=1}
+end
+function M.valid_repl(state)
+  local r=state.repl
+  if not plain(r) or r.version~=1 then return false end
+  for key in pairs(r) do if key~='version' then return false end end
+  return M.valid(state.controller) and state.controller.path=='=lua' and state.controller.source=='' and not state.editor
+end
+-- Shared transaction boundary for both background handlers and REPL submissions.
+local function evaluate(state,c,handler,event,services,repl)
+  local values,prints,banks,effects={}, {},{left={},right={}},{calls=0,circuits=false}
+  for key,value in pairs(c.state) do values[key]=value end
+  for _,side in ipairs({'left','right'}) do
+    for identity,value in pairs(c.outputs and c.outputs[side] or {}) do banks[side][identity]={type=value.type,name=value.name,count=value.count} end
+  end
+  if services then services.prepare(c) end
+  local value,returned
+  if handler then value,returned=handler(context(prints,banks,c,services,effects),event,values) end
+  assert(valid_state(values),'persistent state exceeds scalar/key/payload limits')
+  assert(Circuit.valid_banks(banks),'output bank limit exceeded')
+  local text
+  if repl then
+    if returned then prints[#prints+1]=tostring(scalar(value)) end
+    text=table.concat(prints,'\n'); if #prints>0 then text=text..'\n' end
+  else
+    local output=state.program_output
+    assert(output and M.valid_output(output),'malformed controller output FIFO')
+    local bytes=output.bytes
+    for _,line in ipairs(prints) do bytes=bytes+#line end
+    assert(#output.queue+#prints<=M.output_records and bytes<=M.output_bytes,'background output FIFO is full')
+  end
+  if services and (effects.circuits or next(banks.left) or next(banks.right)) then services.publish(c,banks) end
+  c.state=values; c.outputs=banks
+  if not repl then
+    for _,line in ipairs(prints) do state.program_output.queue[#state.program_output.queue+1]=line; state.program_output.bytes=state.program_output.bytes+#line end
+  end
+  return text
+end
+function M.evaluate_repl(state,source,tick,services)
+  assert(M.valid_repl(state),'incompatible Lua session')
+  local c=state.controller
+  if c.status=='faulted' or c.status=='stopped' then return nil,'Lua session halted; exit and start a new session' end
+  local compiled,err=Compiler.compile(source,'=lua',true)
+  if not compiled then return nil,err end
+  local ok,text=pcall(evaluate,state,c,compiled.on_start,{name='repl',tick=tick},services,true)
+  if not ok then return nil,tostring(text):sub(1,1024) end
+  c.status='running'
+  return text
+end
 function M.step(state,tick,powered,admit,services)
   local c=state.controller
   if not c or c.status=='stopped' or c.status=='faulted' then return false end
@@ -170,6 +226,7 @@ function M.step(state,tick,powered,admit,services)
     if not admit({execution=1,table=16}) then return false,'work deferred' end
     c.status='paused'; return true
   end
+  if state.repl then return false end -- Only an admitted foreground submission executes.
   if c.status~='paused' and tick<c.next_tick then return false end
   if not admit(M.callback_work()) then return false,'work deferred' end
   local entry=cache[c]
@@ -180,34 +237,18 @@ function M.step(state,tick,powered,admit,services)
     cache[c]={source=c.source,path=c.path,generation=c.generation,compiled=compiled}
   end
   if compiled.interval~=c.interval then if services then services.clear() end; c.status='faulted'; c.message='incompatible retained interval'; return true end
-  local values,prints,banks,effects={}, {},{left={},right={}},{calls=0,circuits=false}
-  for key,value in pairs(c.state) do values[key]=value end
-  for _,side in ipairs({'left','right'}) do
-    for identity,value in pairs(c.outputs and c.outputs[side] or {}) do banks[side][identity]={type=value.type,name=value.name,count=value.count} end
-  end
   local name=not c.started and 'on_start' or 'on_tick'
   local handler=compiled[name]
-  local ok,err=pcall(function()
-    if services then services.prepare(c) end
-    if handler then handler(context(prints,banks,c,services,effects),{name=name,tick=tick},values) end
-    assert(valid_state(values),'persistent state exceeds scalar/key/payload limits')
-    assert(Circuit.valid_banks(banks),'output bank limit exceeded')
-    local output=state.program_output
-    assert(output and M.valid_output(output),'malformed controller output FIFO')
-    local bytes=output.bytes
-    for _,text in ipairs(prints) do bytes=bytes+#text end
-    assert(#output.queue+#prints<=M.output_records and bytes<=M.output_bytes,'background output FIFO is full')
-    if services and (effects.circuits or next(banks.left) or next(banks.right)) then services.publish(c,banks) end
-  end)
+  local ok,err=pcall(evaluate,state,c,handler,{name=name,tick=tick},services,false)
   if not ok then
     if services then services.clear() end
     c.status='faulted'; c.message=(c.path..': '..tostring(err)):sub(1,1024); return true
   end
   -- No state or print publication precedes successful full validation.
-  c.state=values; c.outputs=banks; c.started=true; c.status=compiled.on_tick and 'running' or 'stopped'
+  c.started=true; c.status=compiled.on_tick and 'running' or 'stopped'
   if c.status=='stopped' and services then services.clear() end
   c.next_tick=math.min(9007199254740991,tick+c.interval)
-  for _,text in ipairs(prints) do state.program_output.queue[#state.program_output.queue+1]=text; state.program_output.bytes=state.program_output.bytes+#text end
+
   return true
 end
 return M

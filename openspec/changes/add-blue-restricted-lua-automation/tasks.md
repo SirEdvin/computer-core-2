@@ -1,14 +1,19 @@
 # Tasks
 
-This follow-up explicitly supersedes only the predecessor's no-editor/no-user-program/no-circuit exclusions. Keep its original VM compatibility, shared caps, performance gates, historical experiment and incomplete client acceptance intact. These tasks are not completed by prior shell-only evidence. No publication, merge or archive is authorized here.
+This follow-up explicitly supersedes only the predecessor's no-editor/no-user-program/no-circuit exclusions. Keep its original VM compatibility, shared caps, performance gates, historical experiment and incomplete client acceptance intact. These tasks are not completed by prior shell-only evidence. The user subsequently authorized 0.4.0 and conditionally 0.4.1 alpha publication after the input audit/REPL verification; merge and archive remain unauthorized.
 
 ## 1. Native editor and committed writes
 
 - [x] 1.1 Extend the admitted filesystem job path with atomic local file creation/replacement and base-content conflict detection; verify protected paths, missing parents, quotas, maximum accepted file/tree metadata, zero-credit inactivity, before/after-publication cold reload and unchanged unrelated files. Document overwrite/conflict behavior with those tests.
 - [x] 1.2 Add a versioned native multiline editor and `edit PATH` routing in the blue shell; verify new/existing files, 32 KiB cap, newline insertion, middle paste/CRLF normalization, deletion, navigation, cursor/viewport and resize through the real terminal handler while poisoning VM/continuation entry points. Document exact controls and refused targets.
-- [ ] 1.3 Wire Ctrl+S/Ctrl+Q save/discard/cancel and dirty lifecycle disposition to the real save job and GUI; verify failures keep editable drafts, successful saves mark clean only after publication, cancel preserves the session, close/reopen retains state and native capture has no duplicate controls. Add the dirty-exit/save checklist to PLAYTEST.md.
+- [x] 1.3 Wire native Save/Exit editor/Discard/Cancel and optional delivered Ctrl+S/Ctrl+Q to the real save job and dirty lifecycle disposition; verify failures keep editable drafts, successful saves mark clean only after publication, cancel preserves the session, close/reopen retains state and native capture has no duplicate controls. Add the dirty-exit/save checklist to PLAYTEST.md.
 
 ## 2. Finite native source execution
+
+- [x] 2.6 Implement `lua` entry, finite statement/expression compilation, scalar result rendering, session state, exclusive circuit ownership and native Exit Lua; verify real command/input paths, false/nil results, local lifetimes, syntax/runtime recovery, transactional signals/prints and unchanged shared admission with VM/continuation poisoned.
+- [x] 2.7 Verify REPL partial input and admission-deferred submission across separate-process reload without on_load effects, replay or renewed credits; verify power/ownership cleanup, terminate/reboot/shutdown, close/reopen, incompatible retention and committed-only copies. Document language, controls and session lifetime.
+- [x] 2.8 Audit every custom key binding and its shell/editor/original/personal consumers; add native delivery alternatives and verify completion, history, deletion, all navigation and editor menu paths without injected custom events, stale/foreign/power guards, no duplicate capture/input and preserved suspended VM neighbors. Retain graphical delivery limitations separately.
+- [ ] 2.9 Run deterministic 0.4.1 package base/expansion REPL/input/regression matrices and released-save upgrades, update user docs and alpha release notes, commit/push and publish exact verified matching GitHub/Mod Portal bytes under the authorized new version; do not merge/archive or claim unavailable client/multiplayer gates.
 
 - [x] 2.1 Reuse bounded Phobos analysis behind a new default-deny descriptor/handler validator; verify all documented scalar/local/conditional forms and refusal of loops, goto, arbitrary functions/globals, callable aliases, computed indexing, metatables, binary chunks and malformed descriptors with bounded line/column diagnostics. Document the complete supported grammar and source/state/AST limits.
 - [x] 2.2 Emit and activate closed native handler wrappers from validated ASTs, not player text or saved generated code; verify literal escaping, scalar semantics, finite-result/string bounds, depth/node/emission caps, cold revalidation and warm/cold equal work admission with no VM, opcode/AST interpreter or continuation dispatch. Preserve original VM ROM/vendor bytes and document the trust boundary.
@@ -47,9 +52,10 @@ publication, merge or archive is claimed. The PR is prepared locally, not posted
 
 The user's client report establishes that Ctrl+S/Ctrl+Q do not reach the editor
 while typing. Factorio text fields suppress custom-input events; injected key
-tests bypassed that boundary. Task 1.3 is reopened without changing its literal
-shortcut requirement. Native Save / Exit editor and Save / Discard / Cancel
-buttons provide an additive source hotfix, not proof that focused shortcuts now
-work. Other custom navigation/menu inputs have the same unverified delivery
-boundary. Client and joining-peer tasks remain incomplete. The 0.4.0 publication
-and draft PR #5 are historical; this source hotfix is not yet published.
+tests bypassed that boundary. Task 1.3 was reopened at that checkpoint. The
+subsequently approved input-audit scope makes native controls mandatory and
+delivered Ctrl bindings optional; it does not establish that focused shortcuts
+now work. The exact 0.4.1 archive passes native click/consumer contracts and REPL
+recovery in base/expansion, including actual VM editors and real circuit ports.
+Task 2.9 remains pending publication readback; client and joining-peer tasks stay
+incomplete. `docs/RELEASE_0.4.1.md` records the archive and retained failed attempt.

@@ -1,17 +1,20 @@
-# Blue native editing and restricted automation — 0.4.0 alpha
+# Blue native editing and restricted automation — 0.4.1 alpha
 
-This guide describes the 0.4.0 alpha, which adds editing and restricted automation
+This guide describes the 0.4.1 alpha, with native input controls and interactive Lua,
+building on 0.4.0 editing and restricted automation
 to the 0.3.0 shell-only predecessor. Original physical and
 personal computers still run the existing VM/Recrafted OS. Blue computers never
 use that VM or the preserved experimental continuation runtime as a fallback.
 Graphical and joining-peer acceptance remain separate, unverified gates.
 
-Unpublished input hotfix: the current source adds native Save / Exit editor
-buttons. These buttons are not in the released 0.4.0 ZIP. That release's Ctrl+S
+0.4.1 adds native Save / Exit editor buttons and a single terminal key selector.
+These controls are not in the immutable 0.4.0 ZIP. That release's Ctrl+S
 and Ctrl+Q instructions were incorrect while the terminal capture has focus:
 Factorio text fields suppress custom-input shortcuts. The editor handler tests
-did not establish client delivery. This also affects custom navigation keys;
-do not treat those handler tests as verified focused-client navigation.
+did not establish client delivery. Use the key selector and Send key for Tab,
+deletion, arrows, Home/End, Page Up/Down and history. Original/personal terminals
+also offer Editor menu. Native GUI click contracts and actual VM editor consumers
+are headless-tested; this is not proof of licensed-client rendering/focus behavior.
 
 ## Edit, save and run
 
@@ -62,7 +65,49 @@ ROM examples must first be copied locally. There is one controller per computer.
 Explicitly stop before replacement, including replacement of a faulted controller.
 A failed compile does not replace the old record. Editing/saving its path does not
 change the active source snapshot; stop/run selects the newly committed bytes.
-No REPL, auto-start, modules or general Lua environment is provided.
+No auto-start, modules or general Lua environment is provided.
+
+## Interactive Lua
+
+Enter `lua` at the blue shell prompt. It refuses an active/faulted background
+controller: explicitly `stop` first. Try these separate submissions:
+
+    1 + 2
+    math.floor(4.9)
+    state.count = (state.count or 0) + 1
+    state.count
+    local x = 2; state.result = x * 3; print(state.result)
+    circuit.read("left", "red", "item", "iron-plate")
+    circuit.write("right", "virtual", "signal-A", 1)
+    circuit.clear("right")
+    exit
+
+Expressions and explicit scalar returns display their values, including false/nil.
+Print/write/clear calls do not add a spurious nil result. Finite statements use
+the same restricted grammar below without the descriptor/function wrapper.
+`event.tick` and `event.name` are the admitted tick and `repl`. Locals last for
+one submission; only scalar `state.FIELD` values persist between submissions.
+Input is capped at 8 KiB; statement/AST/depth/state/API limits are unchanged.
+Paste normalizes newlines to spaces without executing them; Enter submits once.
+Terminal history is shared with shell commands; Lua completion is not provided.
+
+The REPL exclusively owns the same authorized circuit lease and output banks;
+no background controller runs alongside it. Each whole submission shares the
+original ledger and stages state/prints/signals. Compile/runtime refusals keep
+the session usable and publish none of its staged effects; earlier state/signals
+remain. Unexpected engine publication faults clear unsafe private outputs.
+Close/reopen and cold reload retain partial input, cursor, state and deferred
+submissions without executing on_load or replaying committed effects. `exit`,
+**Exit Lua** or Terminate leaves and clears owned outputs; reboot/shutdown also
+stop it. A new session starts fresh. Power loss clears physical outputs; the next
+explicit successful submission resumes the retained bank/state. Ownership loss
+refuses evaluation and retains recovery data. Copies include committed files only.
+
+`tests/program-mod/repl_checks.lua` covers actual admitted shell submissions,
+maximum input, refusal/recovery, retained exhausted work and cold exactly-once
+publication with VM/continuation execution poisoned. Its clocks are synthetic,
+not graphical latency evidence. Circuit fixtures separately use real owned ports;
+GUI fixtures drive native controls and real shell/VM consumers without custom keys.
 
 ## Complete supported language
 
@@ -183,8 +228,8 @@ Reproducible stock-controller layout:
    chest, with pickup at the feeder and drop at the stock chest.
 3. Connect RIGHT to that inserter using a separate red network. Enable circuit
    control with virtual `signal-A > 0`. Do not connect LEFT to RIGHT.
-4. Copy/edit the example as above. Change `stock < 100` to `stock < 5`, Ctrl+S,
-   Ctrl+Q and run it. The file actually saved is what runs.
+4. Copy/edit the example as above. Change `stock < 100` to `stock < 5`, click Save,
+   then Exit editor and run it. The file actually saved is what runs.
 5. Below five normal iron plates, signal-A is 1 and the inserter transfers stock.
    At 25 plates (above 5 but below the original 100), signal-A is absent/zero and
    transfer stops. Allow an already-held item to finish dropping before measuring

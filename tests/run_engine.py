@@ -18,6 +18,22 @@ from urllib.parse import unquote
 
 ROOT = Path(__file__).resolve().parents[1]
 
+RELEASED_BASELINES = {
+    '0.3.0': '0fc551cdf4c4e563cbfcc45a05b842fe00e34eefc77dd8734505610bd36130d9',
+    '0.4.0': '71fa51e8bdb2a77fc4537a5f1a27d3ff4c7910fe2c26095135c87e9edc8fe7fa',
+}
+
+def baseline_root(path, mod):
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    versions = [version for version, expected in RELEASED_BASELINES.items() if digest == expected]
+    assert len(versions) == 1, 'Baseline must be an exact verified published ZIP'
+    version = versions[0]
+    root = f'{mod}_{version}'
+    with zipfile.ZipFile(path) as archive:
+        info = json.loads(archive.read(f'{root}/info.json'))
+        assert info['name'] == mod and info['version'] == version, 'Baseline metadata mismatch'
+    return root
+
 def fixture_mode(scenario):
     modes = {
         'legacy': ('tests/mod', 'CC2', 80, 60),
@@ -207,7 +223,7 @@ def main():
     parser.add_argument('--reload-columns', type=int, help='Change real guest startup columns between engine processes')
     parser.add_argument('--reload-rows', type=int, help='Change real guest startup rows between engine processes')
     parser.add_argument('--archive', type=Path, help='Test packaged mod rather than the source checkout')
-    parser.add_argument('--baseline-archive', type=Path, help='Released 0.3.0 ZIP used only for the first blue-upgrade process')
+    parser.add_argument('--baseline-archive', type=Path, help='Checksum-pinned released ZIP used for the first blue-upgrade process')
     parser.add_argument('--output', type=Path)
     args = parser.parse_args()
     scenario = 'guest' if args.guest else 'native' if args.native else 'blue-upgrade' if args.blue_upgrade else 'programs' if args.programs else 'shell-stress' if args.shell_stress else 'shell' if args.shell else 'vm-benchmark' if args.vm_benchmark else 'workflow-benchmark' if args.workflow_benchmark else 'legacy'
@@ -247,11 +263,7 @@ def main():
     baseline_name = f'{info["name"]}_0.3.0'
     if args.archive:
         if args.baseline_archive:
-            assert hashlib.sha256(args.baseline_archive.read_bytes()).hexdigest() == '0fc551cdf4c4e563cbfcc45a05b842fe00e34eefc77dd8734505610bd36130d9', 'Baseline must be the actual released 0.3.0 ZIP'
-            with zipfile.ZipFile(args.baseline_archive) as baseline:
-                baseline_info = json.loads(baseline.read(f'{baseline_name}/info.json'))
-                assert baseline_info['name'] == info['name'] and baseline_info['version'] == '0.3.0', 'Baseline must be released 0.3.0 metadata'
-                assert f'{baseline_name}/scripts/programs/compiler.lua' not in baseline.namelist(), 'Baseline already has native programs'
+            baseline_name = baseline_root(args.baseline_archive, info['name'])
         initial_name = baseline_name if args.baseline_archive else mod_name
         shutil.copy2(args.baseline_archive or args.archive, base / 'mods' / f'{initial_name}.zip')
     else:

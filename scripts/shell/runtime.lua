@@ -11,7 +11,7 @@ local Editor = require('__computer_core_2__.scripts.programs.editor')
 local Programs = require('__computer_core_2__.scripts.programs.runtime')
 local ProgramCompiler = require('__computer_core_2__.scripts.programs.compiler')
 local M = {VERSION = 2, BACKEND = 'event-shell', command_bytes = 8192, history_count = 32, history_bytes = 32768, output_chunk = 128}
-local command_names={'cat','cd','clear','cp','edit','help','ls','mkdir','mv','ps','pwd','reboot','rm','run','shutdown','stop'}
+local command_names={'cat','cd','clear','cp','edit','help','ls','lua','mkdir','mv','ps','pwd','reboot','rm','run','shutdown','stop'}
 local T = Terminal.methods
 local handlers, commands = {}, {}
 local function integer(n, low, high)
@@ -40,8 +40,9 @@ function M.committed_disk(state)
 end
 local function prompt(state)
   local d=state.display
-  local full=state.disk.cwd..'> '..state.command
-  local cursor=#state.disk.cwd+2+state.cursor
+  local prefix=state.repl and 'lua> ' or state.disk.cwd..'> '
+  local full=prefix..state.command
+  local cursor=#prefix+state.cursor
   local first=math.max(1,cursor-d.columns+2)
   T.setCursorPos(d,1,d.rows)
   T.clearLine(d)
@@ -63,7 +64,7 @@ commands.pwd=function(state,args)
   output(state,args=='' and state.disk.cwd..'\n' or 'pwd: no arguments accepted\n')
 end
 commands.help=function(state,args)
-  output(state,args=='' and 'Built-ins: help, pwd, cd PATH, ls [PATH], cat PATH, edit PATH, run PATH (or PATH.lua), ps, stop, mkdir PATH, cp SRC DST, mv SRC DST, rm PATH, clear, reboot, shutdown. edit: 32 KiB native document; use Save / Exit editor buttons above the terminal. Dirty exit offers Save / Discard / Cancel. Factorio suppresses custom shortcuts while typing. Save replaces only an unchanged base file. run: 16 KiB finite Lua return descriptor with on_start/on_tick; no loops, recursion, modules or unrestricted globals. One background controller; stop before replace. circuit.read(side,wire,type,name), circuit.write(side,type,name,count), circuit.clear(side): owned left/right ports, normal quality only. Copy /rom/examples/stock-controller.lua locally; wire read-enabled chest to left and signal-A > 0 inserter to right on separate networks. cp/mv refuse overwrite. /rom is read-only. Quote/escape paths. Tab completes.\n'
+  output(state,args=='' and 'Built-ins: help, pwd, cd PATH, ls [PATH], cat PATH, edit PATH, lua, run PATH (or PATH.lua), ps, stop, mkdir PATH, cp SRC DST, mv SRC DST, rm PATH, clear, reboot, shutdown. edit: 32 KiB native document; use Save / Exit editor buttons above the terminal. Dirty exit offers Save / Discard / Cancel. Factorio suppresses custom shortcuts while typing; select a terminal key and Send key for Tab/history/navigation/delete. Save replaces only an unchanged base file. lua: 8 KiB finite expressions/statements; print/math/circuit and scalar state.FIELD; locals last one submission. exit or Exit Lua leaves. stop a background controller first. run: 16 KiB finite Lua return descriptor with on_start/on_tick; no loops, recursion, modules or unrestricted globals. One controller; stop before replace. circuit.read(side,wire,type,name), circuit.write(side,type,name,count), circuit.clear(side): owned left/right ports, normal quality only. Copy /rom/examples/stock-controller.lua locally; wire read-enabled chest to left and signal-A > 0 inserter to right on separate networks. cp/mv refuse overwrite. /rom is read-only. Quote/escape paths. Tab completes shell commands only.\n'
     or 'help: no arguments accepted\n')
 end
 local function path_argument(args)
@@ -72,6 +73,11 @@ local function path_argument(args)
   return values[1]
 end
 commands.edit=function(state,args) Editor.open(state,path_argument(args)) end
+commands.lua=function(state,args,services)
+  assert(args=='','lua: no arguments accepted')
+  Programs.open_repl(state,state.events.tick,services)
+  output(state,'Restricted Lua: expressions / finite statements; state.FIELD persists. exit or Exit Lua leaves. No loops or functions.\n')
+end
 commands.run=function(state,args) state.job=Programs.job(state,path_argument(args)); T.setCursorBlink(state.display,false) end
 commands.ps=function(state,args) assert(args=='','ps: no arguments accepted'); output(state,Programs.describe(state)) end
 commands.stop=function(state,args,services) assert(args=='','stop: no arguments accepted'); Programs.stop(state,services) end
@@ -103,6 +109,7 @@ for _,operation in ipairs({'mkdir','cp','mv','rm'}) do
 end
 local function reset_session(state,status,services)
   Programs.stop(state,services)
+  state.repl=nil
   local tick=state.events.tick
   state.events=Events.new(); state.events.tick=tick
   state.job=nil; state.command,state.cursor='',0; state.history={}; state.history_index=1
@@ -130,6 +137,11 @@ local function valid_job(job)
   if plain(job) and (job.kind=='listing' or job.kind=='completion') then return Directory.valid(job) end
   if plain(job) and job.kind=='filesystem' then return FileJob.valid(job) end
   if plain(job) and job.kind=='program' then return Programs.valid_job(job) end
+  if plain(job) and job.kind=='repl' then
+    local count=0
+    for key in pairs(job) do count=count+1; if count>3 or key~='version' and key~='kind' and key~='source' then return false end end
+    return job.version==1 and type(job.source)=='string' and #job.source<=M.command_bytes
+  end
   if not plain(job) then return false end
   local count=0
   for key in pairs(job) do
@@ -162,6 +174,8 @@ local function valid_state(state)
     and type(state.command)=='string' and #state.command<=M.command_bytes and integer(state.cursor,0,#state.command)
     and history_size(state.history)~=nil and valid_job(state.job)
     and (state.controller==nil or Programs.valid(state.controller))
+    and (state.repl==nil or Programs.valid_repl(state))
+    and (not state.job or state.job.kind~='repl' or state.repl~=nil)
     and (state.program_output==nil or Programs.valid_output(state.program_output))
     and (state.editor==nil or Editor.valid(state.editor) and (not state.editor.saving
       or state.job and state.job.kind=='filesystem' and state.job.op=='write'))
@@ -253,6 +267,12 @@ handlers.key=function(state,event,services)
     T.scroll(state.display,1)
     T.setCursorPos(state.display,1,state.display.rows)
     local fn=name and commands[name]
+    if state.repl then
+      if command:match('^%s*exit%s*$') then
+        Programs.stop(state,services); state.repl=nil; prompt(state)
+      else state.job={version=1,kind='repl',source=command}; T.setCursorBlink(state.display,false) end
+      return
+    end
     if fn then
       local ok,err=pcall(fn,state,args,services)
       if not ok then output(state,tostring(err):sub(1,M.command_bytes)..'\n') end
@@ -264,6 +284,7 @@ handlers.key=function(state,event,services)
       else output(state,'unsupported command; built-ins and restricted local .lua files only\n') end
     end
   elseif key==258 then
+    if state.repl then state.error='Lua has no completion; use literal state.FIELD and documented APIs'; return end
     local ok,job=pcall(Directory.new,state,'completion',nil,command_names)
     if ok then state.job=job; T.setCursorBlink(state.display,false) else state.error=tostring(job):sub(1,1024) end
   elseif key==263 then state.cursor=math.max(0,state.cursor-1)
@@ -316,6 +337,11 @@ handlers.advance=function(state,event,services)
   if job.kind=='program' then
     local ok,err=Programs.activate(state,job,state.events.tick,services)
     if not ok then output(state,err..'\n') else state.job=nil; prompt(state) end
+    return
+  end
+  if job.kind=='repl' then
+    local text,err=Programs.evaluate_repl(state,job.source,state.events.tick,services)
+    output(state,text or ('lua: '..err..'\n'))
     return
   end
   if job.kind=='filesystem' then
@@ -371,12 +397,13 @@ handlers.advance=function(state,event,services)
     state.job=nil; prompt(state)
   end
 end
-handlers.terminate=function(state)
+handlers.terminate=function(state,event,services)
   if state.status=='initializing' then
     state.recovery={message='initialization interrupted',previous_status=state.status}
     state.status='recovery'; return
   end
   state.job=nil
+  if state.repl then Programs.stop(state,services); state.repl=nil end
   state.command,state.cursor='',0
   if state.status=='ready' then prompt(state) end
 end
@@ -426,6 +453,13 @@ function M.handle(state,event,admit,services)
   if name=='advance' and state.job then
     if state.job.kind=='program' then
       for domain,amount in pairs(ProgramCompiler.work()) do cost[domain]=(cost[domain] or 0)+amount end
+    elseif state.job.kind=='repl' then
+      for domain,amount in pairs(Programs.callback_work()) do
+        -- The complete string envelope already includes source, state, bounded
+        -- result rendering and the <=1024-byte shell path. Do not add overhead
+        -- to a full-cap reservation and create a permanently deferred job.
+        cost[domain]=domain=='string' and amount or (cost[domain] or 0)+amount
+      end
     elseif state.job.kind=='filesystem' then
       for domain,amount in pairs(FileJob.work(state.job)) do cost[domain]=(cost[domain] or 0)+amount end
     elseif (state.job.kind=='listing' or state.job.kind=='completion') and state.job.phase~='output' then

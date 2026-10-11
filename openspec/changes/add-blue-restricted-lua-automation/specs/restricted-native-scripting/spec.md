@@ -63,3 +63,18 @@ Controller/draft state SHALL use separately versioned plain data, exact active s
 #### Scenario: Copies and unsupported versions
 - **WHEN** a running blue computer is cloned/blueprinted, or an incompatible script record is loaded
 - **THEN** copies contain committed files but no live program/draft/state/outputs, and incompatible originals remain inert with their source and recovery data preserved
+
+### Requirement: Restricted native interactive Lua shell
+`lua` SHALL enter a foreground REPL accepting finite statements and scalar expressions through the same validated native compiler, scalar math/print/circuit services, transactional effects and unchanged shared quotas. Locals SHALL be submission-local; literal `state.FIELD` values SHALL persist within a session. Entry MUST refuse an active background controller. Expressions and scalar returns MUST display false/nil correctly; unsupported syntax and runtime failures MUST leave the session usable without publishing staged effects.
+
+#### Scenario: Interactive evaluation and recovery
+- **WHEN** a user enters lua, submits expressions, scalar state assignments and allowlisted calls, then an invalid submission
+- **THEN** valid submissions execute once and display bounded results, persistent state survives between submissions and the rejected submission leaves earlier state and signals intact
+
+#### Scenario: Retained pending submission
+- **WHEN** the REPL is closed/reopened or cold-loaded with partial input or an admission-deferred submission
+- **THEN** input, scalar state and shared credits remain plain retained data, no code runs on load and later admitted execution publishes the pending submission exactly once
+
+#### Scenario: Explicit exit and unsafe ownership
+- **WHEN** Exit Lua, exit, Terminate, reboot/shutdown, power failure or ownership invalidation occurs
+- **THEN** explicit exit stops the session and clears owned signals, unsafe outputs are cleared, copies exclude session data and no VM or continuation fallback is invoked

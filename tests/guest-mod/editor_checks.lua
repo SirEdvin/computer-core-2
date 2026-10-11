@@ -1,10 +1,13 @@
 -- Real ROM programs driven with guest events; not graphical input acceptance.
 local VM = require("__computer_core_2__.scripts.guest.vm")
 local Scheduler = require("__computer_core_2__.scripts.guest.scheduler")
+local NativeKeys = require('native_key_driver')
 local M = {}
 local enter, control = 257, 341 -- Pinned LWJGL3 Enter/leftCtrl identifiers.
 local phase = 0
 local function send(vm, ...)
+  local name,code=...
+  if name=='key' then NativeKeys.send(vm,code); return end
   assert(VM.queue(vm, table.pack(...)))
 end
 local function editor_waiting(vm)
@@ -43,7 +46,13 @@ local function pump(vm, predicate)
     end
     -- The parent shell polls timers while its forked editor is alive, so the
     -- root need not wait. Verify the actual editor coroutine's suspension.
-    if (vm.wait or editor_waiting(vm)) and predicate() then report(turns); return turns, vm.instructions - instructions, collection_ticks end
+    local release_pending=false
+    for _,record in ipairs(vm.events.queue) do
+      if record.tuple[1]=='key_up' then release_pending=true end
+    end
+    -- Native GUI taps include key release. Settle that previous interaction
+    -- before measuring the next character, preserving the original echo bound.
+    if not release_pending and (vm.wait or editor_waiting(vm)) and predicate() then report(turns); return turns, vm.instructions - instructions, collection_ticks end
   end
   report(40000)
   for i, row in ipairs(vm.display.lines) do log('CC2 EDITOR FAILURE ROW ' .. i .. ' ' .. row.text) end

@@ -1,9 +1,9 @@
 {
   "name": "computer_core_2",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "title": "Computer Core 2 (ALPHA)",
   "author": "SirEdvin; original Computer Core by Relik77 and contributors",
   "factorio_version": "2.0",
   "dependencies": ["base >= 2.0.77", "! computer_core"],
-  "description": "EXPERIMENTAL 0.4.0 ALPHA PLAYTEST - blue computers now have a native multiline editor, restricted event-driven Lua scripts and owned left/right circuit ports with an editable stock-controller example. No arbitrary Lua, modules, VM fallback or world/network access on blue. Original/personal VM computers retain Recrafted shell/editors. Both models use existing computer research. Graphical input/rendering and multiplayer joins remain unverified. Back up saves and never downgrade a migrated save. Expect bugs and API changes."
+  "description": "EXPERIMENTAL 0.4.1 ALPHA PLAYTEST - native editor save/exit controls and a terminal key selector avoid focused shortcut suppression. Blue computers support a restricted native interactive lua shell, finite saved scripts and owned circuit ports. No arbitrary Lua, loops, modules, VM fallback or world/network access on blue. Original/personal VM computers retain Recrafted. Graphical input/rendering and multiplayer joins remain unverified. Back up saves; never downgrade a migrated save."
 }

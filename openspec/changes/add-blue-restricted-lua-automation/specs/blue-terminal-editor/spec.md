@@ -18,7 +18,7 @@ The blue terminal SHALL provide `edit PATH` for local text files up to 32 KiB, i
 - **THEN** a clear error is shown and committed content and any other draft remain unchanged
 
 ### Requirement: Atomic saves and recoverable refusal
-Ctrl+S SHALL save a draft through bounded validated atomic publication. Saving MUST preserve unrelated files, respect existing disk quotas and reject a target changed since the draft's base snapshot. Failed saves MUST retain editable dirty text and MUST NOT truncate the previous committed file.
+The native Save control SHALL save a draft through bounded validated atomic publication; Ctrl+S MAY do so when the engine delivers the binding. Saving MUST preserve unrelated files, respect existing disk quotas and reject a target changed since the draft's base snapshot. Failed saves MUST retain editable dirty text and MUST NOT truncate the previous committed file.
 
 #### Scenario: Successful replacement and file execution
 - **WHEN** a user saves edited valid Lua source and subsequently runs that path
@@ -33,7 +33,7 @@ Ctrl+S SHALL save a draft through bounded validated atomic publication. Saving M
 - **THEN** unpublished changes never appear as committed data, a committed save is not duplicated, and unrelated files remain intact
 
 ### Requirement: Durable drafts and explicit dirty exit
-Ctrl+Q SHALL exit clean drafts and offer save/discard/cancel for dirty drafts. GUI close/reopen and cold save/reload MUST preserve text, cursor, viewport and dirty status. Explicit reboot/shutdown MUST obtain dirty-exit disposition before discarding the draft; clones/blueprints MUST exclude it.
+The native Exit editor control SHALL exit clean drafts and offer native Save/Discard/Cancel for dirty drafts; Ctrl+Q MAY do so when delivered. GUI close/reopen and cold save/reload MUST preserve text, cursor, viewport and dirty status. Explicit reboot/shutdown MUST obtain dirty-exit disposition before discarding the draft; clones/blueprints MUST exclude it.
 
 #### Scenario: Cancel leaving a dirty editor
 - **WHEN** a user requests exit or reboot and chooses cancel
@@ -49,3 +49,14 @@ Editor interaction SHALL retain existing force/surface/range/research/opened-fra
 #### Scenario: Edit beside an active controller
 - **WHEN** a controller runs at its allowed maximum cost while the user edits, pastes and resizes
 - **THEN** input reaches only the active authorized editor, no second aggregate allowance is granted, and measured terminal-model echo meets the existing p95 two-tick target
+
+### Requirement: Focus-independent terminal key delivery
+All custom-input actions used by the shell, blue editor and original/personal VM applications SHALL have native GUI alternatives while text capture is focused. Delivery MUST preserve opened-frame ownership, authorization, power and shared event admission, use backend-specific key/key-up semantics and restore typing focus without adding a second capture field.
+
+#### Scenario: Native navigation, completion and menu
+- **WHEN** a player selects and sends completion, deletion, navigation, history or VM editor menu through native controls without any custom-input event
+- **THEN** the selected consumer receives that action once, performs its documented behavior and retains subsequent typed input at the correct cursor
+
+#### Scenario: Inactive or forged action
+- **WHEN** a native key action is stale, foreign, unpowered or outside the active authorized frame
+- **THEN** no backend state or event queue is mutated and actionable refusals are visible

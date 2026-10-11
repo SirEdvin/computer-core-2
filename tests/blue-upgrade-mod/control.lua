@@ -39,7 +39,9 @@ script.on_init(function()
     assert(L.build(entity,{computer_core_2=disk}))
   end)
   storage.c=storage.host.computers[1]
-  check('released shell has no editor controller or native circuit ports',storage.c.backend=='event-shell' and not storage.c.native_ports)
+  local old=script.active_mods.computer_core_2=='0.3.0'
+  check('released baseline retains version-appropriate circuit hardware without applications',storage.c.backend=='event-shell'
+    and (old and not storage.c.native_ports or not old and storage.c.native_ports.left and storage.c.native_ports.right))
   log('CC2 BLUE UPGRADE BOOTSTRAP PASS')
 end)
 script.on_load(function()

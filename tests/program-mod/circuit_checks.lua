@@ -104,6 +104,32 @@ function M.run(m,check,host)
       Budget.begin(ledger,game.tick+1); Circuit.priority(ledger,game.tick+1)
       check('inert incompatible records do not consume active cleanup slots forever',ledger.execution_budget.instructions==0 and s.controller==bad)
     end
+    s,service=make('')
+    Programs.stop(s,service); Programs.open_repl(s,game.tick,service)
+    local text,diagnostic=Programs.evaluate_repl(s,'state.read=circuit.read("left","red","item","iron-plate"); return state.read',game.tick,service)
+    assert(text,diagnostic)
+    check('REPL reads actual owned red network as a scalar',type(s.controller.state.read)=='number' and text==tostring(s.controller.state.read)..'\n')
+    text,diagnostic=Programs.evaluate_repl(s,'state.kept=7; circuit.write("right","virtual","signal-A",7)',game.tick,service)
+    assert(text,diagnostic)
+    check('REPL publishes native state and real private signal transaction',s.controller.state.kept==7 and c.native_ports.right.section.filters[1].min==7)
+    local values,banks=s.controller.state,s.controller.outputs
+    text,diagnostic=Programs.evaluate_repl(s,'state.kept=99; circuit.write("right","virtual","signal-A",99); print("UNCOMMITTED"); state.bad=1/0',game.tick,service)
+    check('REPL runtime failure preserves previously committed state and real signals',not text and diagnostic and s.controller.state==values
+      and s.controller.outputs==banks and values.kept==7 and c.native_ports.right.section.filters[1].min==7 and m.foreign.filters[1].min==17)
+    local energy=c.entity.energy; c.entity.energy=0
+    local ledger={version=1}; Budget.begin(ledger,game.tick); Circuit.priority(ledger,game.tick)
+    check('REPL power failure clears real private output and retains state',s.controller.status=='paused'
+      and c.native_ports.right.section.active==false and s.controller.state==values)
+    c.entity.energy=energy
+    text,diagnostic=Programs.evaluate_repl(s,'circuit.clear("right"); state.kept=8',game.tick,service); assert(text,diagnostic)
+    check('REPL restored explicit submission resumes without previous-line replay',s.controller.status=='running'
+      and s.controller.state.kept==8 and #c.native_ports.right.section.filters==0)
+    s.controller.owner.force=s.controller.owner.force+1
+    values=s.controller.state
+    text,diagnostic=Programs.evaluate_repl(s,'state.kept=9',game.tick,service)
+    check('REPL changed owner refuses even scalar publication',not text and diagnostic and s.controller.state==values and values.kept==8)
+    Programs.stop(s,service); s.repl=nil
+    check('REPL exit cleanup preserves unrelated section',#c.native_ports.right.section.filters==0 and m.foreign.filters[1].min==17)
     c.shell=shell; assert(Circuit.clear(c))
   end)
 end

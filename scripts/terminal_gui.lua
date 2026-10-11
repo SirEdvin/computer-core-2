@@ -2,6 +2,7 @@
 local U = require('scripts.util')
 local L = require('scripts.lifecycle')
 local R = require('scripts.os_runtime')
+local Keys = require('scripts.terminal_keys')
 
 local Palette = require('scripts.terminal_palette')
 local M = {}
@@ -68,6 +69,9 @@ function M.render(player)
   local c,session,frame=current(player)
   if not c or not frame then return end
   local actions=frame.cc2_editor_actions
+  if frame.cc2_bar.cc2_repl_exit then
+    frame.cc2_bar.cc2_repl_exit.visible=type(c.shell)=='table' and type(c.shell.repl)=='table'
+  end
   if actions then
     local editor=type(c.shell)=='table' and type(c.shell.editor)=='table' and c.shell.editor or nil
     actions.visible=editor~=nil
@@ -160,6 +164,15 @@ function M.open(player,c)
   bar.add{type='button',name='cc2_shutdown',caption='Shutdown',tooltip='Pause this computer until Reboot. Closing the window does not stop it.'}
   bar.add{type='button',name='cc2_terminate',caption='Terminate',tooltip=shell and 'Cancel foreground work. Committed files remain.' or 'Send termination to the guest program.'}
   bar.add{type='button',name='cc2_close',caption='Close'}
+  if shell then bar.add{type='button',name='cc2_repl_exit',caption='Exit Lua',visible=false} end
+  local keybar=frame.add{type='flow',name='cc2_key_actions',direction='horizontal'}
+  local items={}
+  for i,key in ipairs(Keys.buttons) do
+    if not shell or key.code~=341 then items[#items+1]=key.caption end
+  end
+  keybar.add{type='drop-down',name='cc2_key_choice',items=items,selected_index=1,
+    tooltip='Native terminal keys work while typing focus blocks custom shortcuts.'}
+  keybar.add{type='button',name='cc2_key_send',caption='Send key',tooltip='Send the selected key once, then resume typing.'}
   if shell then
     -- Focused Factorio text fields suppress custom inputs, including Ctrl+S/Q.
     -- These native clicks use the same admitted editor events, not direct saves.
@@ -169,7 +182,7 @@ function M.open(player,c)
     actions.add{type='button',name='cc2_editor_discard',caption='Discard',tooltip='Discard unsaved changes and complete the requested action.',visible=false}
     actions.add{type='button',name='cc2_editor_cancel',caption='Cancel',tooltip='Keep editing without discarding or saving.',visible=false}
   end
-  frame.add{type='label',name='cc2_status',caption='Booting…',style='cc2_status',tooltip=shell and 'Click to type/paste. In edit PATH, use Save / Exit editor above the terminal. Factorio suppresses Ctrl shortcuts while typing.' or 'Click the terminal to type or paste. Enter submits; Ctrl+M opens the editor menu.'}
+  frame.add{type='label',name='cc2_status',caption='Booting…',style='cc2_status',tooltip=shell and 'Click to type/paste. In edit PATH, use Save / Exit editor above the terminal. Factorio suppresses Ctrl shortcuts while typing; use Send key for navigation/completion.' or 'Click the terminal to type or paste. Enter submits. Select Editor menu and Send key for editor actions; focused capture can suppress Ctrl+M.'}
   if c.migration_notice then
     frame.add{type='label',caption='Alpha upgrade: old callbacks retired. Files/drafts retained; see /legacy-recovery and /legacy-startup*. Back up your save.',style='cc2_status'}.style.maximal_width=600
   end
@@ -234,6 +247,9 @@ function M.event(event)
   elseif event.name==defines.events.on_gui_confirmed and element.name=='cc2_capture' then
     tap(player,c,session,257)
   elseif event.name==defines.events.on_gui_click then
+    -- Let the native selector keep focus until a choice is made. Refocusing
+    -- capture on its opening click would immediately dismiss the dropdown.
+    if element==frame.cc2_key_actions.cc2_key_choice then return end
     if element.name=='cc2_close' then M.close(player); return
     elseif element.name=='cc2_reboot' then
       local accepted,err=R.reboot(c)
@@ -242,6 +258,15 @@ function M.event(event)
       local accepted,err=R.shutdown(c)
       session.notice=accepted==false and ('Input refused: '..tostring(err)) or nil
     elseif element.name=='cc2_terminate' then send(player,c,session,'terminate')
+    elseif element==frame.cc2_bar.cc2_repl_exit and R.backend(c)=='event-shell' then
+      if type(c.shell)=='table' and type(c.shell.repl)=='table' then send(player,c,session,'terminate') end
+    elseif element==frame.cc2_key_actions.cc2_key_send then
+      local index=frame.cc2_key_actions.cc2_key_choice.selected_index
+      local key=type(index)=='number' and index==math.floor(index) and Keys.buttons[index]
+      if key and (key.code~=341 or R.backend(c)=='vm') then
+        tap(player,c,session,key.code)
+        if key.code==259 or key.code==261 then session.capture_key_tick=game.tick end
+      end
     elseif element.parent==frame.cc2_editor_actions and R.backend(c)=='event-shell' then
       local editor=type(c.shell)=='table' and type(c.shell.editor)=='table' and c.shell.editor or nil
       if editor then

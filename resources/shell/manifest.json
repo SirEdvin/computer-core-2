@@ -48,7 +48,7 @@
     },
     {
       "path": "scripts/programs/compiler.lua",
-      "sha256": "7e35d6c9d5bc1670d1c2c1a5a790927f9caa6914e32b97585f214bb92baaf88e",
+      "sha256": "d7abe2f871ac73299861525b979c679f3f5ee41e3bb3ce00b597ec8da25d09e5",
       "license": "MIT",
       "license_path": "LICENSE",
       "origin": "project-authored"
@@ -62,7 +62,7 @@
     },
     {
       "path": "scripts/programs/runtime.lua",
-      "sha256": "941e5866f4c640a892d272d246a1aff041fde788dcba3bfbfeb4b963492fc4f1",
+      "sha256": "aba87f4ed5c56bde333788bfc7e2e4f97f957a85ee3265dc719157413eca5a18",
       "license": "MIT",
       "license_path": "LICENSE",
       "origin": "project-authored"
@@ -111,7 +111,7 @@
     },
     {
       "path": "scripts/shell/runtime.lua",
-      "sha256": "389c114c9b4c7296145ab6b012d904aced58311356a3902e0ebb44d0d6448e7b",
+      "sha256": "67216f3cfddcfc7d59ff625ea889933fa8c0812515af56a5f0ef16dcf33dd524",
       "license": "MIT",
       "license_path": "LICENSE",
       "origin": "project-authored"

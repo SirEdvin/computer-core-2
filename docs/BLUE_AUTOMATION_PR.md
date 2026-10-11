@@ -1,5 +1,13 @@
 # Historical pre-publication handoff: native editor and restricted blue automation
 
+Current 0.4.1 follow-up: the approved native key/input audit and restricted `lua`
+REPL pass the exact archived base/expansion matrix, including published 0.3.0 and
+0.4.0 save upgrades. See `RELEASE_0.4.1.md` for checksum, 12 cases / 40 clean
+processes, 44 Python tests and retained failed fixture evidence. Tasks 1.3 and
+2.6–2.8 are verified under their approved native-control requirements; publication
+task 2.9 awaits readback. Tasks 5.2/5.3 remain client/real-peer blockers. Everything
+below is the historical handoff, not the current publication/PR state.
+
 Historical status at the pre-publication checkpoint: local PR handoff only. No commit, push, GitHub PR, release, merge or
 OpenSpec archive has been performed for this implementation checkpoint.
 

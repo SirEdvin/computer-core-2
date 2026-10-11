@@ -5,8 +5,9 @@ The shell-only restrictions and measurements below describe the published
 restricted event-script execution and owned circuit ports; its current controls,
 grammar, transactions and wiring are in [BLUE_AUTOMATION.md](BLUE_AUTOMATION.md).
 It does not restore general Lua or the experimental continuation runtime. Do
-not interpret historical no-editor/no-circuit statements as 0.4.0 behavior,
-or earlier shell-only results as automation acceptance.
+not interpret historical no-editor/no-circuit statements as 0.4.x behavior,
+or earlier shell-only results as automation acceptance. 0.4.1 adds native input
+controls and the restricted `lua` REPL described in the same automation guide.
 
 The selected blue-computer design is a shell with trusted built-in commands,
 not a general-purpose Lua computer. The earlier continuation compiler, Recrafted

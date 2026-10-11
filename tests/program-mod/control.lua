@@ -12,6 +12,7 @@ local Factory=require('factory_checks')
 local Transactions=require('transaction_checks')
 local Cleanup=require('cleanup_checks')
 local Recovery=require('recovery_checks')
+local Repl=require('repl_checks')
 local loaded=false
 local function forbidden() error('restricted program entered VM/continuation execution',0) end
 local run_vm=VM.run
@@ -92,6 +93,7 @@ local authentic='return {interval=1,on_start=function(event,state) state.starts=
 script.on_init(function()
   storage.checks=0; storage.compile_tick=0; syntax(); Transactions.initial(check); Cleanup.initial(check)
   storage.recovery=Recovery.initial(check)
+  storage.repl=Repl.initial(check)
   storage.factory=Factory.new()
   allowed_vm=storage.factory.vm.guest
   storage.ledger=storage.factory.host.terminal_scheduler; storage.boot_tick=game.tick
@@ -106,6 +108,7 @@ script.on_load(function()
     assert(packed(storage.shell)==storage.before and packed(storage.ledger)==storage.budget,'program data/work changed on load')
     Factory.observe(storage.factory)
     Recovery.observe(storage.recovery)
+    Repl.observe(storage.repl)
   end
 end)
 script.on_event(defines.events.on_tick,function()
@@ -114,6 +117,7 @@ script.on_event(defines.events.on_tick,function()
   if stage=='snapshot' and loaded then
     loaded=false
     Recovery.reload(storage.recovery,check)
+    Repl.reload(storage.repl,check)
     check('cold exact source state draft event deadline and work identities are unchanged',packed(s)==storage.before and packed(storage.ledger)==storage.budget
       and s.controller==storage.controller and s.editor==storage.editor)
     local before=packed(s)

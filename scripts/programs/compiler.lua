@@ -19,9 +19,20 @@ local function global(node)
   if node.node_type=='index' and node.src_ex_did_not_exist and node.ex.node_type=='upval_ref'
     and node.ex.name=='_ENV' and node.suffix.node_type=='string' and node.suffix.src_is_ident then return node.suffix.value end
 end
-function M.compile(source,path)
+function M.compile(source,path,repl)
   if type(source)~='string' or #source>M.source_bytes then return nil,(path or '=program')..':1:1: source exceeds 16 KiB' end
-  local ast,err=Analyze(source,path)
+  if repl and #source>8192 then return nil,(path or '=lua')..':1:1: submission exceeds 8 KiB' end
+  -- Both parse attempts share one reserved compiler allowance.
+  -- The prefix is parser input only, never executable player text.
+  local remaining=Limits.compiler_work_per_computer
+  local function spend(amount)
+    if amount>remaining then error('source compiler work limit exceeded',0) end
+    remaining=remaining-amount
+  end
+  local ast,err
+  if repl then ast,err=Analyze('return '..source,path,nil,spend) end
+  local expression=ast~=nil
+  if not ast then ast,err=Analyze(source,path,nil,spend) end
   if not ast then
     if not err:match(':%d+:%d+:') then err=(path or '=program')..':1:1: '..err end
     return nil,err:sub(1,1024)
@@ -42,7 +53,9 @@ function M.compile(source,path)
   end
   local function quote(value) reserve(4*#value+2); return string.format('%q',value) end
   local function fail(node,message)
-    error((path or '=program')..':'..(node.line or 1)..':'..(node.column or 1)..': '..message,0)
+    local line,column=node.line or 1,node.column or 1
+    if expression and line==1 then column=math.max(1,column-7) end
+    error((path or '=program')..':'..line..':'..column..': '..message,0)
   end
   local function visit(node)
     nodes=nodes+1; if nodes>M.nodes then fail(node,'AST node limit exceeded') end
@@ -53,8 +66,9 @@ function M.compile(source,path)
   local expr,block
   local function field(node,parameter)
     return node.node_type=='index' and node.dot_token and node.suffix.node_type=='string'
-      and node.suffix.src_is_ident and #node.suffix.value<=64 and node.ex.node_type=='local_ref'
-      and node.ex.reference_def==parameter and node.suffix.value
+      and node.suffix.src_is_ident and #node.suffix.value<=64
+      and (type(parameter)=='string' and global(node.ex)==parameter
+        or node.ex.node_type=='local_ref' and node.ex.reference_def==parameter) and node.suffix.value
   end
   local function target(node,declare)
     visit(node)
@@ -142,7 +156,13 @@ function M.compile(source,path)
         if #stat.exp_list>1 then fail(stat,'return accepts at most one scalar') end
         local code=''
         if stat.exp_list[1] then local w; code,w=expr(stat.exp_list[1]); add(work,w) end
-        chunks[#chunks+1]=cat({'do return ',code,' end;'})
+        local value=stat.exp_list[1]
+        local call=value and value.node_type=='call' and value.ex
+        local root=call and call.node_type=='index' and global(call.ex)
+        local void=expression and call and (global(call)=='print' or root=='circuit'
+          and call.suffix.node_type=='string' and (call.suffix.value=='write' or call.suffix.value=='clear'))
+        if void then chunks[#chunks+1]=cat({'do ',code,'; return nil,false end;'})
+        else chunks[#chunks+1]=cat({'do return ',code~='' and code or 'nil',repl and ',true' or '', ' end;'}) end
       elseif kind=='dostat' then
         local code,w=block(stat); chunks[#chunks+1]=cat({'do ',code,' end;'}); add(work,w)
       elseif kind=='ifstat' then
@@ -166,6 +186,14 @@ function M.compile(source,path)
     return cat(chunks,'\n'),work
   end
   local ok,result=pcall(function()
+    local generated,maxcircuits,maxprints
+    if repl then
+      current={state='state',event='event',names={}}
+      local code,w=block(ast)
+      if w.circuits>16 or w.prints>8 then fail(ast,'submission exceeds 16 circuit / 8 print calls') end
+      maxcircuits,maxprints=w.circuits,w.prints
+      generated=cat({'return {interval=1,on_start=function(a,e,s)\n',code,'\nend}'})
+    else
     local ret=ast.body.first
     while ret and ret.node_type=='empty' do visit(ret); ret=ret.next end
     local following=ret and ret.next
@@ -175,7 +203,7 @@ function M.compile(source,path)
     local descriptor=ret.exp_list[1]; visit(descriptor)
     if descriptor.node_type~='constructor' then fail(descriptor,'program descriptor must be a literal table') end
     local seen,handlers,interval={}, {},60
-    local maxcircuits,maxprints=0,0
+    maxcircuits,maxprints=0,0
     for _,entry in ipairs(descriptor.fields) do
       if entry.type=='list' or entry.key.node_type~='string' or not entry.key.src_is_ident then fail(descriptor,'descriptor fields must be literal named entries') end
       visit(entry.key); visit(entry.value)
@@ -198,12 +226,13 @@ function M.compile(source,path)
       else fail(value,'unknown descriptor field '..name) end
     end
     if #handlers==0 then fail(descriptor,'at least one handler is required') end
-    local generated=cat({'return {interval=',tostring(interval),',',cat(handlers,','),'}'})
-    if #generated>M.emitted_bytes then fail(descriptor,'emitted wrapper exceeds 64 KiB') end
+    generated=cat({'return {interval=',tostring(interval),',',cat(handlers,','),'}'})
+    end
+    if #generated>M.emitted_bytes then fail(ast,'emitted wrapper exceeds 64 KiB') end
     -- Only this freshly emitted text enters load; neither source nor storage
     -- supplies generated code. No globals exist in the wrapper environment.
     local loader,loaderr=load(generated,'=restricted:'..(path or 'program'),'t',{})
-    if not loader then fail(descriptor,tostring(loaderr):sub(1,512)) end
+    if not loader then fail(ast,tostring(loaderr):sub(1,512)) end
     local compiled=loader()
     local reconstruction=M.work()
     compiled.work={compiler=reconstruction.compiler,execution=129+2*nodes+2*statements+16*maxcircuits+8*maxprints,
@@ -211,7 +240,7 @@ function M.compile(source,path)
     for domain,amount in pairs(compiled.work) do
       local cap=({compiler=Limits.compiler_work_per_computer,execution=Limits.instructions_per_computer,string=Limits.string_work_per_computer,
         table=Limits.table_work_per_computer,event=Limits.event_work_per_computer,filesystem=Limits.filesystem_work_per_computer})[domain]
-      if amount>cap then fail(descriptor,'complete callback exceeds fresh '..domain..' quota') end
+      if amount>cap then fail(ast,'complete callback exceeds fresh '..domain..' quota') end
     end
     compiled.nodes,compiled.statements=nodes,statements
     return compiled

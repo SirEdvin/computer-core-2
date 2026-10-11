@@ -65,9 +65,12 @@ local function initial()
   check('builtin produces fixed output job',s.job and s.job.kind=='output' and s.job.text=='/\n')
   event(s,{n=1,'advance'})
   check('builtin job completes without suspended calls',s.job==nil and s.command=='' and s.status=='ready')
-  for _,request in ipairs({'lua evil.lua','load evil.lua','__computer_core_2__.scripts.guest.vm'}) do
+  for _,case in ipairs({{'lua evil.lua','lua: no arguments accepted'},
+    {'load evil.lua','unsupported'},{'__computer_core_2__.scripts.guest.vm','unsupported'}}) do
+    local request,diagnostic=case[1],case[2]
     event(s,{n=2,'paste',request}); event(s,{n=2,'key',257})
-    check('unknown command never executes '..request,s.job and s.job.text:find('unsupported',1,true)~=nil)
+    check('unsupported source execution never runs '..request,s.job and s.job.text:find(diagnostic,1,true)~=nil
+      and not s.repl and not s.controller)
     while s.job do event(s,{n=1,'advance'}) end
   end
   before=serpent.line(s,{sortkeys=true})

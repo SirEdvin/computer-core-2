@@ -5,6 +5,8 @@ local Compiler=require('__computer_core_2__.scripts.guest.compiler')
 local Terminal=require('__computer_core_2__.scripts.guest.terminal')
 local ShellScheduler=require('__computer_core_2__.scripts.shell.scheduler')
 local VMScheduler=require('__computer_core_2__.scripts.guest.scheduler')
+local Keys=require('__computer_core_2__.scripts.terminal_keys')
+local Lifecycle=require('__computer_core_2__.scripts.lifecycle')
 
 return function(check)
   local report,results=check,{}
@@ -317,6 +319,74 @@ return function(check)
     for _,child in ipairs(frame.children) do if child.name=='cc2_capture' then captures=captures+1 end end
     check('mock native editing adds no duplicate capture widget',captures==1)
     check('mock native edit save lifecycle and close preserve suspended personal VM graph',serpent.line(peer.guest,{sortkeys=true})==peer_before)
+    local function native(code)
+      local choice=frame.cc2_key_actions.cc2_key_choice
+      for i,key in ipairs(Keys.buttons) do if key.code==code then choice.selected_index=i end end
+      click(frame.cc2_key_actions.cc2_key_send)
+      assert(step())
+    end
+    local function type_text(text)
+      capture.text=text; GUI.event{player_index=1,name=defines.events.on_gui_text_changed,element=capture}; assert(step())
+    end
+    local function finish() while shell.job do assert(step()) end end
+    local old_focus=focus
+    click(frame.cc2_key_actions.cc2_key_choice)
+    check('mock native selector opening does not immediately steal focus back',focus==old_focus)
+    type_text('abc'); native(263); type_text('X')
+    check('native Left then typing preserves shell insertion cursor',shell.command=='abXc')
+    native(268); native(261); native(269); native(259)
+    check('native Home Delete End Backspace have actual shell effects',shell.command=='bX' and shell.cursor==2)
+    native(263); native(262)
+    check('native Right restores shell insertion position',shell.cursor==2)
+    click(frame.cc2_bar.cc2_terminate); assert(step())
+    type_text('pw'); native(258); finish()
+    check('native Tab completes actual shell input without custom event',shell.command=='pwd ' or shell.command=='pwd')
+    native(257); finish(); native(265)
+    check('native Up recalls submitted shell history',shell.command:match('^pwd')~=nil)
+    native(264)
+    check('native Down restores pre-history draft',shell.command=='')
+    type_text('edit /draft.lua'); native(257)
+    local document=assert(shell.editor); local original=document.text
+    native(269); native(265); native(264); native(266); native(267); native(268)
+    check('native editor line/page navigation preserves document bytes',shell.editor==document and document.text==original and document.cursor>=0 and document.cursor<=#original)
+    native(261); native(259); native(263); native(262)
+    check('native editor deletion/navigation uses actual draft consumer',document.dirty and document.text~=original)
+    click(frame.cc2_bar.cc2_terminate); assert(step()); GUI.render(player)
+    click(actions.cc2_editor_discard); assert(step())
+    type_text('lua'); native(257); finish(); GUI.render(player)
+    check('native GUI Lua entry exposes Exit Lua',shell.repl and frame.cc2_bar.cc2_repl_exit.visible)
+    type_text('state.answer=40+2'); native(257); finish()
+    check('native GUI Lua evaluates typed statements through selected runtime',shell.controller.state.answer==42 and shell.repl)
+    type_text('state.answer'); native(263)
+    saved=serpent.line(shell,{sortkeys=true}); GUI.close(player); assert(GUI.open(player,computer)); frame=screen.cc2_root; capture=frame.cc2_capture
+    check('native GUI Lua close/reopen preserves input state and cursor',serpent.line(shell,{sortkeys=true})==saved)
+    game.tick=game.tick+1
+    local snapshot,copy_error=Lifecycle.snapshot(computer); assert(snapshot,copy_error)
+    local copy=assert(ShellScheduler.new(snapshot.computer_core_2,51,19,storage.terminal_scheduler,3,game.tick))
+    while copy.status~='ready' do
+      game.tick=game.tick+1; assert(ShellScheduler.step(copy,storage.terminal_scheduler,3,game.tick,true))
+    end
+    check('active REPL production snapshot/import copies only committed files',not copy.repl and not copy.controller
+      and copy.command=='' and copy.disk.fs['/draft.lua'].text==shell.disk.fs['/draft.lua'].text
+      and copy.disk.fs['/draft.lua']~=shell.disk.fs['/draft.lua'] and serpent.line(shell,{sortkeys=true})==saved)
+    click(frame.cc2_bar.cc2_repl_exit); assert(step()); GUI.render(player)
+    check('native Exit Lua clears partial input and returns shell',shell.repl==nil and shell.controller.status=='stopped' and shell.command=='')
+    saved=serpent.line(shell,{sortkeys=true}); click(frame.cc2_bar.cc2_repl_exit)
+    frame.cc2_key_actions.cc2_key_choice.selected_index=999; click(frame.cc2_key_actions.cc2_key_send)
+    check('stale Lua exit and invalid native selection do not inject shell input',serpent.line(shell,{sortkeys=true})==saved)
+    frame.cc2_key_actions.cc2_key_choice.selected_index=1
+    player.opened=element({}); click(frame.cc2_key_actions.cc2_key_send); player.opened=frame
+    computer.entity.energy=0; click(frame.cc2_key_actions.cc2_key_send)
+    check('inactive and unpowered native key actions preserve shell',serpent.line(shell,{sortkeys=true})==saved and storage.sessions[1].notice=='Input refused: Computer is not powered')
+    computer.entity.energy=100
+    local peer_frame=second.gui.screen.cc2_root
+    local pq=#peer.guest.events.queue
+    for i,key in ipairs(Keys.buttons) do
+      peer_frame.cc2_key_actions.cc2_key_choice.selected_index=i
+      GUI.event{player_index=2,name=defines.events.on_gui_click,element=peer_frame.cc2_key_actions.cc2_key_send}
+      check('native VM key selector preserves key/key-up protocol '..key.caption,peer.guest.events.queue[pq+1].tuple[2]==key.code
+        and peer.guest.events.queue[pq+2].tuple[1]=='key_up'); pq=pq+2
+    end
     GUI.close(player); GUI.close(second)
   end)
   game,storage=real_game,real_storage
