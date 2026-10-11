@@ -56,8 +56,12 @@ The 0.4.0 alpha adds native `edit`, restricted event-script `run`,
 `ps`/`stop`, owned circuit ports and an editable stock-control example. It does
 not support arbitrary Lua, a REPL or VM fallback. Follow
 [the blue automation guide](docs/BLUE_AUTOMATION.md) for exact controls, language,
-limits and wiring. Copy `/rom/examples/stock-controller.lua` to `/stock.lua`,
-edit and save it with Ctrl+S, leave with Ctrl+Q, then `run /stock.lua`.
+limits and wiring. **Known 0.4.0 input bug:** focused Factorio text fields suppress
+Ctrl+S/Ctrl+Q custom shortcuts. The current source adds native Save / Exit editor
+buttons as an unpublished hotfix; those buttons are not in the 0.4.0 release ZIP.
+In the released blue editor, click **Terminate**, then type **s** at the dirty
+confirmation to save and return to the shell, or **c** to keep editing. No draft
+is discarded unless you explicitly choose **d**.
 The 0.3.0 description below is historical. Graphical/multiplayer acceptance
 remains incomplete. Use `python3 tests/run_engine.py --programs` and repeat with
 `--expansion`; `--archive <zip>` exercises an exact candidate package.

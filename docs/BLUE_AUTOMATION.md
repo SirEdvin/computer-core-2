@@ -6,6 +6,13 @@ personal computers still run the existing VM/Recrafted OS. Blue computers never
 use that VM or the preserved experimental continuation runtime as a fallback.
 Graphical and joining-peer acceptance remain separate, unverified gates.
 
+Unpublished input hotfix: the current source adds native Save / Exit editor
+buttons. These buttons are not in the released 0.4.0 ZIP. That release's Ctrl+S
+and Ctrl+Q instructions were incorrect while the terminal capture has focus:
+Factorio text fields suppress custom-input shortcuts. The editor handler tests
+did not establish client delivery. This also affects custom navigation keys;
+do not treat those handler tests as verified focused-client navigation.
+
 ## Edit, save and run
 
 Supply power, research Computer, open the blue body with Ctrl+left-click within
@@ -20,9 +27,10 @@ The native editor starts at the beginning of the document:
 - Left/Right, Home/End, Up/Down and Page Up/Page Down move the cursor/viewport.
 - Backspace deletes the preceding byte; Delete deletes the following byte.
 - Paste inserts at the cursor, preserves the suffix and normalizes CRLF/CR to LF.
-- Ctrl+S starts a save. The draft remains dirty while publication is pending.
-- Ctrl+Q leaves a clean draft. For dirty text choose `s` save, `d` discard or
-  `c` cancel. Escape cancels the confirmation. Reboot, Shutdown and Terminate
+- Use the native **Save** button above the terminal. The draft remains dirty
+  while publication is pending; Save is disabled during that work.
+- **Exit editor** leaves a clean draft. For dirty text use the native **Save**,
+  **Discard** or **Cancel** buttons (or type `s`, `d`, `c`). Reboot, Shutdown and Terminate
   also request explicit dirty disposition; cancel preserves editor/controller.
 - Closing/reopening the GUI retains the draft and controller. This is not a save.
 
@@ -43,7 +51,7 @@ conflict does not rebase silently: deliberately discard/reopen after recovering
 any wanted text. Canceling an unpublished save discards its candidate, not its
 draft. A cold reload before/after publication cannot publish twice.
 
-After saving, Ctrl+Q returns to the shell:
+After saving, **Exit editor** returns to the shell:
 
     run /stock.lua
     ps

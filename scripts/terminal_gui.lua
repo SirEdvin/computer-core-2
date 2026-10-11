@@ -67,6 +67,17 @@ end
 function M.render(player)
   local c,session,frame=current(player)
   if not c or not frame then return end
+  local actions=frame.cc2_editor_actions
+  if actions then
+    local editor=type(c.shell)=='table' and type(c.shell.editor)=='table' and c.shell.editor or nil
+    actions.visible=editor~=nil
+    if editor then
+      actions.cc2_editor_save.enabled=not editor.saving
+      actions.cc2_editor_exit.visible=editor.confirm~=true
+      actions.cc2_editor_discard.visible=editor.confirm==true
+      actions.cc2_editor_cancel.visible=editor.confirm==true
+    end
+  end
   local display=R.display(c)
   status(frame,c,session)
   if not display then return end
@@ -149,7 +160,16 @@ function M.open(player,c)
   bar.add{type='button',name='cc2_shutdown',caption='Shutdown',tooltip='Pause this computer until Reboot. Closing the window does not stop it.'}
   bar.add{type='button',name='cc2_terminate',caption='Terminate',tooltip=shell and 'Cancel foreground work. Committed files remain.' or 'Send termination to the guest program.'}
   bar.add{type='button',name='cc2_close',caption='Close'}
-  frame.add{type='label',name='cc2_status',caption='Booting…',style='cc2_status',tooltip=shell and 'Click to type/paste. edit PATH: Enter inserts a newline; Ctrl+S saves, Ctrl+Q exits. Dirty exit: s/d/c.' or 'Click the terminal to type or paste. Enter submits; Ctrl+M opens the editor menu.'}
+  if shell then
+    -- Focused Factorio text fields suppress custom inputs, including Ctrl+S/Q.
+    -- These native clicks use the same admitted editor events, not direct saves.
+    local actions=frame.add{type='flow',name='cc2_editor_actions',direction='horizontal',visible=false}
+    actions.add{type='button',name='cc2_editor_save',caption='Save',tooltip='Save the native draft. In an exit confirmation, save and then exit.',visible=true}
+    actions.add{type='button',name='cc2_editor_exit',caption='Exit editor',tooltip='Return to the shell. Unsaved text asks save/discard/cancel.',visible=true}
+    actions.add{type='button',name='cc2_editor_discard',caption='Discard',tooltip='Discard unsaved changes and complete the requested action.',visible=false}
+    actions.add{type='button',name='cc2_editor_cancel',caption='Cancel',tooltip='Keep editing without discarding or saving.',visible=false}
+  end
+  frame.add{type='label',name='cc2_status',caption='Booting…',style='cc2_status',tooltip=shell and 'Click to type/paste. In edit PATH, use Save / Exit editor above the terminal. Factorio suppresses Ctrl shortcuts while typing.' or 'Click the terminal to type or paste. Enter submits; Ctrl+M opens the editor menu.'}
   if c.migration_notice then
     frame.add{type='label',caption='Alpha upgrade: old callbacks retired. Files/drafts retained; see /legacy-recovery and /legacy-startup*. Back up your save.',style='cc2_status'}.style.maximal_width=600
   end
@@ -222,6 +242,14 @@ function M.event(event)
       local accepted,err=R.shutdown(c)
       session.notice=accepted==false and ('Input refused: '..tostring(err)) or nil
     elseif element.name=='cc2_terminate' then send(player,c,session,'terminate')
+    elseif element.parent==frame.cc2_editor_actions and R.backend(c)=='event-shell' then
+      local editor=type(c.shell)=='table' and type(c.shell.editor)=='table' and c.shell.editor or nil
+      if editor then
+        if element.name=='cc2_editor_save' and not editor.saving then tap(player,c,session,501)
+        elseif element.name=='cc2_editor_exit' and not editor.confirm then tap(player,c,session,502)
+        elseif element.name=='cc2_editor_discard' and editor.confirm then send(player,c,session,'char','d')
+        elseif element.name=='cc2_editor_cancel' and editor.confirm then send(player,c,session,'char','c') end
+      end
 
     elseif tags.cc2_cell then
       if R.backend(c)=='vm' then

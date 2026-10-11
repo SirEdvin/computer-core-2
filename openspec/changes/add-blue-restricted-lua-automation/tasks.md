@@ -6,7 +6,7 @@ This follow-up explicitly supersedes only the predecessor's no-editor/no-user-pr
 
 - [x] 1.1 Extend the admitted filesystem job path with atomic local file creation/replacement and base-content conflict detection; verify protected paths, missing parents, quotas, maximum accepted file/tree metadata, zero-credit inactivity, before/after-publication cold reload and unchanged unrelated files. Document overwrite/conflict behavior with those tests.
 - [x] 1.2 Add a versioned native multiline editor and `edit PATH` routing in the blue shell; verify new/existing files, 32 KiB cap, newline insertion, middle paste/CRLF normalization, deletion, navigation, cursor/viewport and resize through the real terminal handler while poisoning VM/continuation entry points. Document exact controls and refused targets.
-- [x] 1.3 Wire Ctrl+S/Ctrl+Q save/discard/cancel and dirty lifecycle disposition to the real save job and GUI; verify failures keep editable drafts, successful saves mark clean only after publication, cancel preserves the session, close/reopen retains state and native capture has no duplicate controls. Add the dirty-exit/save checklist to PLAYTEST.md.
+- [ ] 1.3 Wire Ctrl+S/Ctrl+Q save/discard/cancel and dirty lifecycle disposition to the real save job and GUI; verify failures keep editable drafts, successful saves mark clean only after publication, cancel preserves the session, close/reopen retains state and native capture has no duplicate controls. Add the dirty-exit/save checklist to PLAYTEST.md.
 
 ## 2. Finite native source execution
 
@@ -42,3 +42,14 @@ Headless/component evidence and local PR handoff are recorded in
 `docs/BLUE_AUTOMATION_PR.md`. Tasks 5.2 and 5.3 remain blocked on a licensed
 graphical client and a real joining peer, respectively. No full acceptance,
 publication, merge or archive is claimed. The PR is prepared locally, not posted.
+
+## Focused-input defect found after 0.4.0 publication
+
+The user's client report establishes that Ctrl+S/Ctrl+Q do not reach the editor
+while typing. Factorio text fields suppress custom-input events; injected key
+tests bypassed that boundary. Task 1.3 is reopened without changing its literal
+shortcut requirement. Native Save / Exit editor and Save / Discard / Cancel
+buttons provide an additive source hotfix, not proof that focused shortcuts now
+work. Other custom navigation/menu inputs have the same unverified delivery
+boundary. Client and joining-peer tasks remain incomplete. The 0.4.0 publication
+and draft PR #5 are historical; this source hotfix is not yet published.

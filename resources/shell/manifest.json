@@ -55,7 +55,7 @@
     },
     {
       "path": "scripts/programs/editor.lua",
-      "sha256": "05ea56a8e7ebf5c359c727849b42a43fe0414521bff8e1979763149131b7fd52",
+      "sha256": "83c41d36d643809e2bd5445a211e344b4689e41bfc2e4e4b7f822d9f88716c7c",
       "license": "MIT",
       "license_path": "LICENSE",
       "origin": "project-authored"
@@ -104,14 +104,14 @@
     },
     {
       "path": "scripts/shell/resources.lua",
-      "sha256": "eb53752da32ecfcbf17336f0d0a52c4e26c1d45f4c59ccb6a71e6130e2c63192",
+      "sha256": "1f7e741558a8fcc5472eab08c15f51dceb1ef8997275d3696093575794a08337",
       "license": "MIT",
       "license_path": "LICENSE",
       "origin": "project-authored"
     },
     {
       "path": "scripts/shell/runtime.lua",
-      "sha256": "2ac65f8985745889c2ebe6483436a6e5e1db2bc4a5fd161dc91eb1bb3cf7ccdb",
+      "sha256": "389c114c9b4c7296145ab6b012d904aced58311356a3902e0ebb44d0d6448e7b",
       "license": "MIT",
       "license_path": "LICENSE",
       "origin": "project-authored"

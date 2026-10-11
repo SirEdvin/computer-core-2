@@ -65,7 +65,7 @@ function M.render(state)
   if d.rows>1 then
     T.setCursorPos(d,1,d.rows)
     local message=e.confirm and ('Unsaved '..(e.disposition or 'exit')..': s save / d discard / c cancel')
-      or e.message or 'Ctrl+S save / Ctrl+Q exit'
+      or e.message or 'Save / Exit editor: buttons above terminal'
     T.write(d,message:sub(1,d.columns))
   end
   T.setCursorPos(d,col-e.left+1,math.max(1,math.min(d.rows-1,row-e.top+2)))

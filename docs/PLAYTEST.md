@@ -143,6 +143,11 @@ Use the checksum-identified 0.4.0 archive with
 Follow its chest/feeder/inserter layout with separate left/right red networks.
 All boxes below remain unchecked until tested with actual clients.
 
+Known 0.4.0 failure: the focused text capture suppresses Ctrl+S/Ctrl+Q. The
+unpublished source hotfix adds native Save / Exit editor buttons. Test those
+clicks separately from custom-input injection; the old shortcut checklist below
+is not satisfied by the workaround or by handler-only tests.
+
 - [ ] Copy the stock example locally; edit its threshold from 100 to 5 using
       keyboard navigation/paste. Ctrl+S must preserve the dirty draft until
       publication; Ctrl+Q must return to the prompt only after the chosen action.

@@ -12,6 +12,12 @@ does not close graphical or real joining-peer acceptance.
 
 ## Compatibility boundary
 
+- **Known 0.4.0 client input failure:** focused Factorio text fields suppress
+  custom inputs, including Ctrl+S/Ctrl+Q. Direct-handler and GUI mock tests did
+  not test engine delivery. The unpublished source hotfix provides native blue
+  editor Save / Exit editor and Save / Discard / Cancel buttons. Other custom
+  navigation/menu shortcuts remain subject to the same engine limitation.
+
 - The blue model has a native editor and executes only validated, restricted
   event-driven Lua source. It cannot run arbitrary Lua, user modules or the
   Recrafted OS. `/rom/help.txt` is read-only data. Original/personal VM computers retain
