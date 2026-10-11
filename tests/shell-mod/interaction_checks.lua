@@ -2,6 +2,7 @@ local Shell=require('__computer_core_2__.scripts.shell.runtime')
 local Scheduler=require('__computer_core_2__.scripts.shell.scheduler')
 local Budget=require('__computer_core_2__.scripts.shell.budget')
 local Parser=require('__computer_core_2__.scripts.shell.parser')
+local Resources=require('__computer_core_2__.scripts.shell.resources')
 local new=require('construct')
 local M={}
 local function packed(s) return serpent.line(s,{sortkeys=true}) end
@@ -61,7 +62,7 @@ function M.initial(check)
   d.line('draft'); d.send({n=2,'key',263}); d.send({n=2,'key',265}); d.send({n=2,'key',264})
   check('history returns saved draft cursor',s.command=='draft' and s.cursor==4)
   d.send({n=1,'terminate'}); d.command('cd /rom'); check('read-only directory navigation is confined',s.disk.cwd=='/rom')
-  d.command('cat help.txt'); check('read-only data resources have actual cat support',s.job.kind=='cat' and s.job.text:find('trusted built-in',1,true)); d.drain()
+  d.command('cat help.txt'); check('read-only data resources have actual cat support',s.job.kind=='cat' and s.job.text==Resources['/rom/help.txt'].text); d.drain()
   d.command('ls /'); while s.job.phase~='output' do d.step() end
   local listed=s.job.items
   check('real ls orders complete literal children',#listed==6 and listed[4].name=='rom/' and listed[5].name=='space dir/')

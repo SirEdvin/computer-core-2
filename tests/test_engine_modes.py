@@ -1,13 +1,45 @@
 """Fixture routing and metric parsing, not engine acceptance."""
 import unittest
 import io
+import hashlib
+import json
+from pathlib import Path
+import tempfile
+import zipfile
 from unittest.mock import patch
 
 from run_engine import fixture_mode, parse_benchmark_metrics, parse_workflow_metrics, parse_workflow_profiles, parse_workflow_diagnostics
-from run_engine import main
+from run_engine import main, baseline_root
 
 
 class FixtureModeTests(unittest.TestCase):
+    def test_baseline_root_follows_checksum_pinned_release_not_candidate_version(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'baseline.zip'
+            for version in ['0.3.0', '0.4.0']:
+                root = 'computer_core_2_' + version
+                with zipfile.ZipFile(path, 'w') as archive:
+                    archive.writestr(root + '/info.json', json.dumps({'name': 'computer_core_2', 'version': version}))
+                pinned = {version: hashlib.sha256(path.read_bytes()).hexdigest()}
+                with patch('run_engine.RELEASED_BASELINES', pinned):
+                    self.assertEqual(baseline_root(path, 'computer_core_2'), root)
+
+    def test_unknown_baseline_bytes_are_refused_before_zip_inspection(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'unknown.zip'
+            path.write_bytes(b'not a released archive')
+            with self.assertRaisesRegex(AssertionError, 'exact verified'):
+                baseline_root(path, 'computer_core_2')
+
+    def test_pinned_baseline_metadata_must_match_its_version_and_identity(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'baseline.zip'
+            with zipfile.ZipFile(path, 'w') as archive:
+                archive.writestr('computer_core_2_0.4.0/info.json', json.dumps({'name': 'computer_core_2', 'version': '0.4.1'}))
+            pinned = {'0.4.0': hashlib.sha256(path.read_bytes()).hexdigest()}
+            with patch('run_engine.RELEASED_BASELINES', pinned), self.assertRaisesRegex(AssertionError, 'metadata mismatch'):
+                baseline_root(path, 'computer_core_2')
+
     def test_existing_modes_keep_their_settings(self):
         self.assertEqual(fixture_mode('legacy'), ('tests/mod', 'CC2', 80, 60))
         self.assertEqual(fixture_mode('guest'), ('tests/guest-mod', 'CC2 GUEST', 80, 60))
@@ -23,6 +55,14 @@ class FixtureModeTests(unittest.TestCase):
 
     def test_direct_shell_has_an_independent_fixture(self):
         self.assertEqual(fixture_mode('shell'), ('tests/shell-mod', 'CC2 SHELL', 120, 60))
+
+    def test_released_blue_upgrade_is_a_distinct_three_process_fixture(self):
+        self.assertEqual(fixture_mode('blue-upgrade'), ('tests/blue-upgrade-mod', 'CC2 BLUE UPGRADE', 2000, 120))
+        for arguments in [['--blue-upgrade'], ['--shell', '--baseline-archive', 'old.zip']]:
+            with patch('sys.argv', ['run_engine.py', *arguments]), patch('sys.stderr', new_callable=io.StringIO):
+                with self.assertRaises(SystemExit) as stopped:
+                    main()
+            self.assertEqual(stopped.exception.code, 2)
 
     def test_configuration_change_requires_the_shell_fixture_before_engine_execution(self):
         with patch('sys.argv', ['run_engine.py', '--guest', '--shell-config-change']), patch('sys.stderr', new_callable=io.StringIO) as error:

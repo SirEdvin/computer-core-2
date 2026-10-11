@@ -5,6 +5,8 @@ local Compiler=require('__computer_core_2__.scripts.guest.compiler')
 local Terminal=require('__computer_core_2__.scripts.guest.terminal')
 local ShellScheduler=require('__computer_core_2__.scripts.shell.scheduler')
 local VMScheduler=require('__computer_core_2__.scripts.guest.scheduler')
+local Keys=require('__computer_core_2__.scripts.terminal_keys')
+local Lifecycle=require('__computer_core_2__.scripts.lifecycle')
 
 return function(check)
   local report,results=check,{}
@@ -110,7 +112,7 @@ return function(check)
     assert(GUI.open(player,computer))
     frame=screen.cc2_root; capture=frame.cc2_capture
     check('mock shell presentation identifies initialization without reading stale VM display',frame.caption=='Shell computer 1'
-      and frame.cc2_status.caption=='Initializing…' and not frame.cc2_status.tooltip:find('editor',1,true))
+      and frame.cc2_status.caption=='Initializing…' and frame.cc2_status.tooltip:find('Save / Exit editor',1,true))
     assert(ShellScheduler.step(computer.shell,storage.terminal_scheduler,1,game.tick,true))
     GUI.render(player)
     local shell_grid=frame.cc2_scroll.cc2_cells
@@ -184,7 +186,9 @@ return function(check)
     local second={index=2,valid=true,character={valid=true},gui={screen=element({})},force=force,surface=surface,position={x=0,y=0},
       display_scale=1,display_resolution={width=1920,height=1080}}
     players[2]=second
-    local peer={id=2,personal=true,player_index=2,guest=VM.new(assert(Compiler.compile('return true')))}
+    local peer={id=2,personal=true,player_index=2,guest=VM.new(assert(Compiler.compile('os.pullEvent("char")')))}
+    VM.run(peer.guest,4096)
+    check('mock personal VM neighbor retains an actually suspended guest stack',peer.guest.objects[peer.guest.main.ref].status=='waiting')
     storage.computers[2]=peer
     assert(GUI.open(second,peer))
     local peer_queue=#peer.guest.events.queue
@@ -192,6 +196,7 @@ return function(check)
     GUI.key({player_index=2},263)
     check('mock simultaneous shell and VM viewers use independent event protocols',shell.cursor==0 and #peer.guest.events.queue==peer_queue+2
       and peer.guest.events.queue[peer_queue+2].tuple[1]=='key_up' and #vm.events.queue==queued)
+    local peer_before=serpent.line(peer.guest,{sortkeys=true})
     computer.entity.electric_buffer_size=5000000; computer.entity.energy=0
     saved=serpent.line(shell,{sortkeys=true})
     click(frame.cc2_bar.cc2_reboot)
@@ -228,6 +233,160 @@ return function(check)
     saved=serpent.line(shell,{sortkeys=true})
     GUI.close(player); assert(GUI.open(player,computer))
     check('mock shell reopen preserves complete session and leaves VM viewer open',serpent.line(shell,{sortkeys=true})==saved and storage.sessions[2].id==2)
+    frame=screen.cc2_root; capture=frame.cc2_capture
+    capture.text='edit /draft.lua'
+    GUI.event{player_index=1,name=defines.events.on_gui_text_changed,element=capture}
+    GUI.event{player_index=1,name=defines.events.on_gui_confirmed,element=capture}
+    assert(step()); assert(step()); local editor=assert(shell.editor)
+    capture.text='first line\nsecond line'
+    GUI.event{player_index=1,name=defines.events.on_gui_text_changed,element=capture}; assert(step())
+    GUI.key({player_index=1},263); assert(step())
+    saved=serpent.line(shell,{sortkeys=true}); local cursor=editor.cursor
+    GUI.close(player); assert(GUI.open(player,computer)); frame=screen.cc2_root; capture=frame.cc2_capture
+    check('mock native editor close/reopen preserves exact dirty draft cursor viewport and VM neighbor',shell.editor==editor
+      and editor.dirty and editor.cursor==cursor and serpent.line(shell,{sortkeys=true})==saved and storage.sessions[2].id==2)
+    click(frame.cc2_bar.cc2_reboot); assert(step())
+    check('mock GUI reboot requests dirty native disposition instead of discarding',shell.editor==editor and editor.confirm and editor.disposition=='reboot')
+    capture.text='c'; GUI.event{player_index=1,name=defines.events.on_gui_text_changed,element=capture}; assert(step())
+    check('mock GUI dirty reboot cancel retains document and committed disk',shell.editor==editor and not editor.confirm and shell.disk==disk and not disk.fs['/draft.lua'])
+    click(frame.cc2_bar.cc2_shutdown); assert(step())
+    capture.text='c'; GUI.event{player_index=1,name=defines.events.on_gui_text_changed,element=capture}; assert(step())
+    check('mock GUI dirty shutdown cancel retains ready editor and VM events',shell.editor==editor and not editor.confirm and shell.status=='ready' and #peer.guest.events.queue==peer_queue+2)
+    GUI.render(player)
+    local actions=frame.cc2_editor_actions
+    check('mock focused native editor exposes save and exit without custom-input events',actions and actions.visible
+      and actions.cc2_editor_save.visible and actions.cc2_editor_exit.visible and not actions.cc2_editor_discard.visible)
+    click(actions.cc2_editor_exit); assert(step()); GUI.render(player)
+    check('mock native exit button requests dirty disposition without losing the draft',shell.editor==editor
+      and editor.confirm and editor.disposition=='exit' and actions.cc2_editor_discard.visible and actions.cc2_editor_cancel.visible
+      and not actions.cc2_editor_exit.visible)
+    click(actions.cc2_editor_cancel); assert(step()); GUI.render(player)
+    check('mock native cancel button preserves dirty editor and restores normal actions',shell.editor==editor and editor.dirty
+      and not editor.confirm and actions.cc2_editor_exit.visible and not actions.cc2_editor_cancel.visible)
+    saved=serpent.line(shell,{sortkeys=true}); player.opened=element({})
+    click(actions.cc2_editor_save); click(actions.cc2_editor_exit)
+    check('mock inactive editor buttons cannot save or exit',serpent.line(shell,{sortkeys=true})==saved)
+    player.opened=frame; computer.entity.energy=0
+    click(actions.cc2_editor_save); click(actions.cc2_editor_exit)
+    check('mock unpowered editor buttons preserve draft and expose refusal',serpent.line(shell,{sortkeys=true})==saved
+      and storage.sessions[1].notice=='Input refused: Computer is not powered')
+    computer.entity.energy=100
+    local draft=editor.text
+    click(actions.cc2_editor_save); assert(step())
+    check('mock native save button stages atomic write while draft stays dirty',editor.saving and editor.dirty and shell.job.op=='write' and not shell.disk.fs['/draft.lua'])
+    GUI.render(player)
+    check('mock editor save button is disabled while publication is pending',not actions.cc2_editor_save.enabled)
+    while shell.job do assert(step()) end
+    check('mock GUI native save publishes exact multiline source before marking clean',shell.editor==editor and not editor.dirty and shell.disk.fs['/draft.lua'].text==draft)
+    click(actions.cc2_editor_exit); assert(step()); GUI.render(player)
+    check('mock native exit button returns shell without legacy VM input',shell.editor==nil and shell.status=='ready'
+      and not actions.visible and #peer.guest.events.queue==peer_queue+2)
+    saved=serpent.line(shell,{sortkeys=true})
+    click(actions.cc2_editor_save); click(actions.cc2_editor_discard)
+    check('mock stale editor buttons cannot inject shell input',serpent.line(shell,{sortkeys=true})==saved)
+    shell.editor=42; GUI.render(player); saved=serpent.line(shell,{sortkeys=true})
+    click(actions.cc2_editor_save); click(actions.cc2_editor_exit)
+    check('mock malformed retained editor remains untouched with actions hidden',not actions.visible
+      and serpent.line(shell,{sortkeys=true})==saved)
+    shell.editor=nil
+    capture.text='edit /draft.lua'; GUI.event{player_index=1,name=defines.events.on_gui_text_changed,element=capture}
+    GUI.event{player_index=1,name=defines.events.on_gui_confirmed,element=capture}; assert(step()); assert(step())
+    capture.text='prefix '; GUI.event{player_index=1,name=defines.events.on_gui_text_changed,element=capture}; assert(step())
+    click(actions.cc2_editor_exit); assert(step()); GUI.render(player)
+    click(actions.cc2_editor_save); assert(step())
+    check('mock confirmation Save retains draft until save-on-exit publication',shell.editor and shell.editor.saving
+      and shell.editor.disposition=='exit' and shell.disk.fs['/draft.lua'].text==draft)
+    while shell.job do assert(step()) end
+    check('mock confirmation Save exits only after exact committed publication',shell.editor==nil and shell.disk.fs['/draft.lua'].text=='prefix '..draft)
+    capture.text='edit /draft.lua'; GUI.event{player_index=1,name=defines.events.on_gui_text_changed,element=capture}
+    GUI.event{player_index=1,name=defines.events.on_gui_confirmed,element=capture}; assert(step()); assert(step())
+    capture.text='discard '; GUI.event{player_index=1,name=defines.events.on_gui_text_changed,element=capture}; assert(step())
+    click(actions.cc2_editor_exit); assert(step()); GUI.render(player)
+    click(actions.cc2_editor_discard); assert(step()); GUI.render(player)
+    check('mock confirmation Discard preserves saved file and exits dirty editor',shell.editor==nil
+      and shell.disk.fs['/draft.lua'].text=='prefix '..draft and not actions.visible)
+    capture.text='edit /draft.lua'; GUI.event{player_index=1,name=defines.events.on_gui_text_changed,element=capture}
+    GUI.event{player_index=1,name=defines.events.on_gui_confirmed,element=capture}; assert(step()); assert(step())
+    capture.text='keep '; GUI.event{player_index=1,name=defines.events.on_gui_text_changed,element=capture}; assert(step())
+    click(frame.cc2_bar.cc2_terminate); assert(step())
+    check('mock existing Terminate control requests dirty editor confirmation without losing text',shell.editor
+      and shell.editor.confirm and shell.editor.disposition=='terminate')
+    capture.text='s'; GUI.event{player_index=1,name=defines.events.on_gui_text_changed,element=capture}; assert(step())
+    while shell.job do assert(step()) end
+    check('mock existing Terminate then typed s saves draft and returns to shell',shell.editor==nil
+      and shell.disk.fs['/draft.lua'].text=='keep prefix '..draft and shell.status=='ready')
+    local captures=0
+    for _,child in ipairs(frame.children) do if child.name=='cc2_capture' then captures=captures+1 end end
+    check('mock native editing adds no duplicate capture widget',captures==1)
+    check('mock native edit save lifecycle and close preserve suspended personal VM graph',serpent.line(peer.guest,{sortkeys=true})==peer_before)
+    local function native(code)
+      local choice=frame.cc2_key_actions.cc2_key_choice
+      for i,key in ipairs(Keys.buttons) do if key.code==code then choice.selected_index=i end end
+      click(frame.cc2_key_actions.cc2_key_send)
+      assert(step())
+    end
+    local function type_text(text)
+      capture.text=text; GUI.event{player_index=1,name=defines.events.on_gui_text_changed,element=capture}; assert(step())
+    end
+    local function finish() while shell.job do assert(step()) end end
+    local old_focus=focus
+    click(frame.cc2_key_actions.cc2_key_choice)
+    check('mock native selector opening does not immediately steal focus back',focus==old_focus)
+    type_text('abc'); native(263); type_text('X')
+    check('native Left then typing preserves shell insertion cursor',shell.command=='abXc')
+    native(268); native(261); native(269); native(259)
+    check('native Home Delete End Backspace have actual shell effects',shell.command=='bX' and shell.cursor==2)
+    native(263); native(262)
+    check('native Right restores shell insertion position',shell.cursor==2)
+    click(frame.cc2_bar.cc2_terminate); assert(step())
+    type_text('pw'); native(258); finish()
+    check('native Tab completes actual shell input without custom event',shell.command=='pwd ' or shell.command=='pwd')
+    native(257); finish(); native(265)
+    check('native Up recalls submitted shell history',shell.command:match('^pwd')~=nil)
+    native(264)
+    check('native Down restores pre-history draft',shell.command=='')
+    type_text('edit /draft.lua'); native(257)
+    local document=assert(shell.editor); local original=document.text
+    native(269); native(265); native(264); native(266); native(267); native(268)
+    check('native editor line/page navigation preserves document bytes',shell.editor==document and document.text==original and document.cursor>=0 and document.cursor<=#original)
+    native(261); native(259); native(263); native(262)
+    check('native editor deletion/navigation uses actual draft consumer',document.dirty and document.text~=original)
+    click(frame.cc2_bar.cc2_terminate); assert(step()); GUI.render(player)
+    click(actions.cc2_editor_discard); assert(step())
+    type_text('lua'); native(257); finish(); GUI.render(player)
+    check('native GUI Lua entry exposes Exit Lua',shell.repl and frame.cc2_bar.cc2_repl_exit.visible)
+    type_text('state.answer=40+2'); native(257); finish()
+    check('native GUI Lua evaluates typed statements through selected runtime',shell.controller.state.answer==42 and shell.repl)
+    type_text('state.answer'); native(263)
+    saved=serpent.line(shell,{sortkeys=true}); GUI.close(player); assert(GUI.open(player,computer)); frame=screen.cc2_root; capture=frame.cc2_capture
+    check('native GUI Lua close/reopen preserves input state and cursor',serpent.line(shell,{sortkeys=true})==saved)
+    game.tick=game.tick+1
+    local snapshot,copy_error=Lifecycle.snapshot(computer); assert(snapshot,copy_error)
+    local copy=assert(ShellScheduler.new(snapshot.computer_core_2,51,19,storage.terminal_scheduler,3,game.tick))
+    while copy.status~='ready' do
+      game.tick=game.tick+1; assert(ShellScheduler.step(copy,storage.terminal_scheduler,3,game.tick,true))
+    end
+    check('active REPL production snapshot/import copies only committed files',not copy.repl and not copy.controller
+      and copy.command=='' and copy.disk.fs['/draft.lua'].text==shell.disk.fs['/draft.lua'].text
+      and copy.disk.fs['/draft.lua']~=shell.disk.fs['/draft.lua'] and serpent.line(shell,{sortkeys=true})==saved)
+    click(frame.cc2_bar.cc2_repl_exit); assert(step()); GUI.render(player)
+    check('native Exit Lua clears partial input and returns shell',shell.repl==nil and shell.controller.status=='stopped' and shell.command=='')
+    saved=serpent.line(shell,{sortkeys=true}); click(frame.cc2_bar.cc2_repl_exit)
+    frame.cc2_key_actions.cc2_key_choice.selected_index=999; click(frame.cc2_key_actions.cc2_key_send)
+    check('stale Lua exit and invalid native selection do not inject shell input',serpent.line(shell,{sortkeys=true})==saved)
+    frame.cc2_key_actions.cc2_key_choice.selected_index=1
+    player.opened=element({}); click(frame.cc2_key_actions.cc2_key_send); player.opened=frame
+    computer.entity.energy=0; click(frame.cc2_key_actions.cc2_key_send)
+    check('inactive and unpowered native key actions preserve shell',serpent.line(shell,{sortkeys=true})==saved and storage.sessions[1].notice=='Input refused: Computer is not powered')
+    computer.entity.energy=100
+    local peer_frame=second.gui.screen.cc2_root
+    local pq=#peer.guest.events.queue
+    for i,key in ipairs(Keys.buttons) do
+      peer_frame.cc2_key_actions.cc2_key_choice.selected_index=i
+      GUI.event{player_index=2,name=defines.events.on_gui_click,element=peer_frame.cc2_key_actions.cc2_key_send}
+      check('native VM key selector preserves key/key-up protocol '..key.caption,peer.guest.events.queue[pq+1].tuple[2]==key.code
+        and peer.guest.events.queue[pq+2].tuple[1]=='key_up'); pq=pq+2
+    end
     GUI.close(player); GUI.close(second)
   end)
   game,storage=real_game,real_storage

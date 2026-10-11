@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Run real Factorio bootstrap, tick and save/reload regressions in isolation."""
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -17,12 +18,30 @@ from urllib.parse import unquote
 
 ROOT = Path(__file__).resolve().parents[1]
 
+RELEASED_BASELINES = {
+    '0.3.0': '0fc551cdf4c4e563cbfcc45a05b842fe00e34eefc77dd8734505610bd36130d9',
+    '0.4.0': '71fa51e8bdb2a77fc4537a5f1a27d3ff4c7910fe2c26095135c87e9edc8fe7fa',
+}
+
+def baseline_root(path, mod):
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    versions = [version for version, expected in RELEASED_BASELINES.items() if digest == expected]
+    assert len(versions) == 1, 'Baseline must be an exact verified published ZIP'
+    version = versions[0]
+    root = f'{mod}_{version}'
+    with zipfile.ZipFile(path) as archive:
+        info = json.loads(archive.read(f'{root}/info.json'))
+        assert info['name'] == mod and info['version'] == version, 'Baseline metadata mismatch'
+    return root
+
 def fixture_mode(scenario):
     modes = {
         'legacy': ('tests/mod', 'CC2', 80, 60),
         'guest': ('tests/guest-mod', 'CC2 GUEST', 80, 60),
         'native': ('tests/native-mod', 'CC2 NATIVE', 600, 180),
         'shell': ('tests/shell-mod', 'CC2 SHELL', 120, 60),
+        'programs': ('tests/program-mod', 'CC2 PROGRAMS', 2000, 120),
+        'blue-upgrade': ('tests/blue-upgrade-mod', 'CC2 BLUE UPGRADE', 2000, 120),
         'shell-stress': ('tests/shell-stress-mod', 'CC2 SHELL STRESS', 40000, 600),
         'vm-benchmark': ('tests/vm-benchmark-mod', 'CC2 VM BENCH', 20000, 300),
         'workflow-benchmark': ('tests/workflow-benchmark-mod', 'CC2 WORKFLOW', 20000, 300),
@@ -189,6 +208,8 @@ def main():
     scenarios.add_argument('--guest', action='store_true', help='Run the isolated guest feasibility scenario (not client acceptance)')
     scenarios.add_argument('--native', action='store_true', help='Run exact-engine native-load/persistence probes (not a completed runtime)')
     scenarios.add_argument('--shell', action='store_true', help='Run isolated direct event-shell regressions (not client acceptance)')
+    scenarios.add_argument('--programs', action='store_true', help='Run restricted native editor/source/cold-process and real-tick echo checks')
+    scenarios.add_argument('--blue-upgrade', action='store_true', help='Create a released blue save, upgrade it, then cold-reload pending native work')
     parser.add_argument('--shell-config-change', action='store_true', help='Upgrade only the shell test fixture between processes to exercise a real configuration change')
     scenarios.add_argument('--shell-stress', action='store_true', help='Run maximum admitted shell jobs beside an interactive VM on real ticks')
     scenarios.add_argument('--vm-benchmark', action='store_true', help='Measure shipped VM workflows with one dispatch per simulation tick (not client latency)')
@@ -202,9 +223,14 @@ def main():
     parser.add_argument('--reload-columns', type=int, help='Change real guest startup columns between engine processes')
     parser.add_argument('--reload-rows', type=int, help='Change real guest startup rows between engine processes')
     parser.add_argument('--archive', type=Path, help='Test packaged mod rather than the source checkout')
+    parser.add_argument('--baseline-archive', type=Path, help='Checksum-pinned released ZIP used for the first blue-upgrade process')
     parser.add_argument('--output', type=Path)
     args = parser.parse_args()
-    scenario = 'guest' if args.guest else 'native' if args.native else 'shell-stress' if args.shell_stress else 'shell' if args.shell else 'vm-benchmark' if args.vm_benchmark else 'workflow-benchmark' if args.workflow_benchmark else 'legacy'
+    scenario = 'guest' if args.guest else 'native' if args.native else 'blue-upgrade' if args.blue_upgrade else 'programs' if args.programs else 'shell-stress' if args.shell_stress else 'shell' if args.shell else 'vm-benchmark' if args.vm_benchmark else 'workflow-benchmark' if args.workflow_benchmark else 'legacy'
+    if args.blue_upgrade and (not args.archive or not args.baseline_archive):
+        parser.error('--blue-upgrade requires --archive and --baseline-archive')
+    if args.baseline_archive and not args.blue_upgrade:
+        parser.error('--baseline-archive requires --blue-upgrade')
     if args.benchmark_characters < 1:
         parser.error('Benchmark character count must be positive')
     if args.shell_config_change and not args.shell:
@@ -234,8 +260,12 @@ def main():
     (base / 'write/saves').mkdir(parents=True, exist_ok=True)
     info = json.loads((ROOT / 'info.json').read_text())
     mod_name = f'{info["name"]}_{info["version"]}'
+    baseline_name = f'{info["name"]}_0.3.0'
     if args.archive:
-        shutil.copy2(args.archive, base / 'mods' / f'{mod_name}.zip')
+        if args.baseline_archive:
+            baseline_name = baseline_root(args.baseline_archive, info['name'])
+        initial_name = baseline_name if args.baseline_archive else mod_name
+        shutil.copy2(args.baseline_archive or args.archive, base / 'mods' / f'{initial_name}.zip')
     else:
         link = base / 'mods' / mod_name
         if not link.exists():
@@ -252,7 +282,7 @@ def main():
         with zipfile.ZipFile(args.archive) as archive:
             gui_source = archive.read(f"{mod_name}/scripts/gui.lua").decode()
             assert json.loads(archive.read(f"{mod_name}/info.json")) == info
-            assert not any(("/docs/" in name and name != f'{mod_name}/docs/SHELL_RUNTIME.md') or "/examples/" in name or (name.endswith("/README.md") and name != f'{mod_name}/vendor/README.md') for name in archive.namelist())
+            assert not any(("/docs/" in name and name not in {f'{mod_name}/docs/SHELL_RUNTIME.md', f'{mod_name}/docs/BLUE_AUTOMATION.md'}) or "/examples/" in name or (name.endswith("/README.md") and name != f'{mod_name}/vendor/README.md') for name in archive.namelist())
     else:
         gui_source = (ROOT / "scripts/gui.lua").read_text()
     sep = "="
@@ -330,6 +360,8 @@ def main():
                     # Do not interrupt the engine until its requested ZIP is readable.
                     if label == 'first' and not zipfile.is_zipfile(base / 'write/saves/cc2-resume.zip'):
                         continue
+                    if args.blue_upgrade and label == 'reload' and not zipfile.is_zipfile(base / 'write/saves/cc2-upgraded.zip'):
+                        continue
                     completed = True
                     break
             shutdown = stop_engine(process, lines, console=completed)
@@ -362,12 +394,22 @@ def main():
             f'data.raw["int-setting"]["computer-core-terminal-{name}"].{field} = {literal}'
             for name, value in [('columns', reload_columns), ('rows', reload_rows)]
             for field, literal in [('default_value', str(value)), ('allowed_values', f'{{{value}}}')]) + '\n')
-    if args.shell_config_change:
-        assert test_info['version'] == '0.0.1', 'Unexpected shell fixture version'
+    if args.blue_upgrade:
+        (base / 'mods' / f'{baseline_name}.zip').unlink()
+        shutil.copy2(args.archive, base / 'mods' / f'{mod_name}.zip')
+    if args.shell_config_change or args.blue_upgrade:
+        assert test_info['version'] == '0.0.1', 'Unexpected fixture version'
         test_info['version'] = '0.0.2'
         (test_dir / 'info.json').write_text(json.dumps(test_info, indent=2) + '\n')
         test_dir = test_dir.rename(test_dir.parent / f'{test_info["name"]}_{test_info["version"]}')
     reload = run('reload', ['--start-server', str(save), '--server-settings', str(base / 'server.json'), '--bind', '127.0.0.1', '--port', '0', '--until-tick', str(until_tick)], [prefix + ' COMPLETE RELOAD'])
+    cold = None
+    if args.blue_upgrade:
+        assert reload.count(prefix + ' CONFIGURATION CHANGED') == 1
+        upgraded_save = base / 'write/saves/cc2-upgraded.zip'
+        assert zipfile.is_zipfile(upgraded_save), 'Missing readable upgraded snapshot'
+        cold = run('candidate-reload', ['--start-server', str(upgraded_save), '--server-settings', str(base / 'server.json'), '--bind', '127.0.0.1', '--port', '0', '--until-tick', str(until_tick)], [prefix + ' COMPLETE COLD'])
+        assert prefix + ' CONFIGURATION CHANGED' not in cold and prefix + ' COMPLETE COLD' not in reload
     if args.shell_config_change:
         assert 'CC2 BLUE CONFIGURATION CHANGED' not in first and reload.count('CC2 BLUE CONFIGURATION CHANGED') == 1, 'Missing/duplicate configuration change'
     if scenario != 'legacy':
@@ -401,6 +443,11 @@ def main():
         assert all(m['backend'] == args.benchmark_backend and m['case'] == args.benchmark_case for m in summary['metrics']), 'Wrong workflow identity'
         summary['client_latency_verified'] = False
     summary['processes'] = phase_evidence
+    if cold is not None:
+        match = re.search(re.escape(prefix) + r' COMPLETE COLD checks=(\d+)', cold)
+        assert match is not None
+        summary['cold_checks'] = int(match.group(1))
+        summary['baseline_archive'] = str(args.baseline_archive.resolve())
     if args.guest or args.native:
         summary['terminal'] = {'columns': columns, 'rows': rows}
         summary['reload_terminal'] = {'columns': reload_columns, 'rows': reload_rows}

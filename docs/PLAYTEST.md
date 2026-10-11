@@ -1,6 +1,6 @@
-# 0.3.0 alpha playtest
+# 0.4.1 alpha playtest
 
-Experimental terminal-OS playtest guidance for the **0.3.0 alpha** build;
+Experimental terminal-OS playtest guidance for the **0.4.1 alpha** build;
 not a publication announcement or stable acceptance claim. Graphical/client tests
 below belong to the playtester and are **not yet passed**. See
 [known limitations](KNOWN_LIMITATIONS.md) before upgrading.
@@ -10,7 +10,7 @@ below belong to the playtester and are **not yet passed**. See
 1. **Back up your saves and keep an untouched copy.** Prefer a fresh test world;
    upgrade only a separate copy of an existing Computer Core 2 save.
 2. Use Factorio **2.0.77 or newer**. Copy the supplied
-   `computer_core_2_0.3.0.zip` into Factorio's `mods` directory and enable Computer
+   `computer_core_2_0.4.1.zip` into Factorio's `mods` directory and enable Computer
    Core 2. Do not enable the original `computer_core` alongside it. Ensure all
    multiplayer clients have the same mod version and startup settings.
 3. Verify the archive/version supplied by the maintainer; this document does not
@@ -40,8 +40,10 @@ below belong to the playtester and are **not yet passed**. See
 
 Click the terminal itself to type or paste; accepted text is sent immediately.
 The native capture widget is visually hidden but remains focusable. Press Enter to submit. Navigation uses
-keyboard shortcuts; the fallback button row has been removed. Use **Ctrl+M**,
-then type **s** to save or **e** to exit the advanced editor.
+the terminal key selector and **Send key**: focused capture suppresses custom
+keyboard shortcuts. Select **Editor menu** on original/personal terminals,
+then type **s** to save or **e** to exit the advanced editor. Blue editors provide
+**Save / Exit editor** controls instead.
 Clicking a terminal cell sends its one-based position; drag/physical release are
 not implemented. Close preserves execution. Reboot discards unsaved guest buffers
 but keeps saved files; Shutdown pauses the computer until Reboot. This is an
@@ -59,7 +61,7 @@ not inferred from the retired workbench UI:
    print("Hello from the playtest")
    ```
 
-3. The vendored editor uses **Ctrl** to open its menu, then **S** to save;
+3. Select **Editor menu** and click **Send key**, then **S** to save;
    use its displayed menu and **E** to exit. Consult in-game controls for the
    Factorio-to-terminal key mapping rather than assuming Ctrl+S works.
 4. Run `ls`, reopen with `edit /hello.lua`, verify the text, exit, then run
@@ -135,3 +137,46 @@ not native client acceptance. Leave these boxes unchecked until genuinely tested
 Record exact archive hash, Factorio version, startup geometry, UI scale, event/job
 state and reproducible steps. Keep screenshots/logs outside the repository. Real
 graphical latency and multiplayer joining remain blocking acceptance gates.
+
+## 0.4.1 native editor/controller and interactive Lua alpha
+
+Use the checksum-identified 0.4.1 archive with
+[BLUE_AUTOMATION.md](BLUE_AUTOMATION.md), not the shell-only released ZIP.
+Follow its chest/feeder/inserter layout with separate left/right red networks.
+All boxes below remain unchecked until tested with actual clients.
+
+Known 0.4.0 failure: the focused text capture suppresses Ctrl+S/Ctrl+Q. The
+0.4.1 adds native Save / Exit editor buttons and the terminal key selector. Test those
+clicks separately from custom-input injection; the old shortcut checklist below
+is not satisfied by the workaround or by handler-only tests.
+
+- [ ] Copy the stock example locally; edit its threshold from 100 to 5 using
+      keyboard navigation/paste. Ctrl+S must preserve the dirty draft until
+      publication; Ctrl+Q must return to the prompt only after the chosen action.
+- [ ] Confirm Enter inserts a newline, middle paste preserves its suffix,
+      Backspace/Delete and viewport/navigation/resize work without focus theft.
+      No second visible editor widget or duplicate navigation controls appears.
+- [ ] Dirty exit, Terminate, Reboot and Shutdown offer save/discard/cancel.
+      Cancel keeps draft/controller; a refused save retains editable text.
+      Close/reopen and a saved-world reload preserve cursor/viewport/dirty state.
+- [ ] Run the edited file, inspect ps and verify actual transfer below five
+      plates and stable stopping at five. Let a held item complete its drop.
+      Stop clears only private outputs; unrelated circuit sections survive.
+- [ ] Cut power, restore it with changed stock, then save/reload. No start replay
+      or stale signal-A appears before a fresh evaluation. Record true rendered
+      responsiveness beside an original VM computer, not model-tick latency.
+- [ ] A real second client joins during dirty editing, exhausted callback credits
+      and pending input/save work. Compare source/state/draft/deadline/work and
+      owned wires; verify no on_load effects and exactly-once subsequent commits.
+- [ ] Without custom shortcuts, use Send key for completion/history, middle
+      deletion, arrows, Home/End, editor Page Up/Down and original/personal menu.
+      Opening the selector must not steal focus immediately; sending a key must
+      restore capture. Test stale/foreign/unpowered clicks and no duplicate input.
+- [ ] Enter `lua` on blue, evaluate `1+2`, `math.floor(4.9)`, `false`, and `nil`;
+      assign `state.n=7`, check `state.n` and per-submission locals. Syntax/runtime
+      errors must recover without committing state/prints/signals. Exercise real
+      left reads and right writes; Exit Lua/Terminate must clear owned outputs.
+- [ ] Close/reopen and cold reload with partial Lua input and exhausted/deferred
+      submissions; compare input/cursor/history/state/ledger. Join a real peer in
+      that state. No on_load effects, replay or renewed consumed same-tick credits.
+      Verify power/ownership refusal, reboot/shutdown cleanup and clean copies.

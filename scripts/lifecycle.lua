@@ -1,6 +1,7 @@
 local U = require("scripts.util")
 local FS = require("scripts.filesystem")
 local R = require("scripts.os_runtime")
+local Circuit = require("scripts.programs.circuit")
 local A = require("scripts.adapters")
 local M = {}
 local specs = {
@@ -61,9 +62,10 @@ function M.ensure(c)
   if not c.entity or not c.entity.valid then return end
   M.sync(c)
   if c.external then return end
-  if R.backend(c)~='vm' then return end -- No fallback/peripheral construction for shell or recovery records.
+  local native=R.backend(c)=='event-shell' and c.entity.name=='blue-computer-interface-entity'
+  if not native and R.backend(c)~='vm' then return end -- Unknown selectors never construct peripherals.
   c.sub = c.sub or {}
-  for _, key in ipairs(U.keys(specs)) do
+  for _, key in ipairs(native and {'left_combinator','right_combinator'} or U.keys(specs)) do
     local spec, child = specs[key], c.sub[key]
     local created = not child or not child.valid
     if created then
@@ -75,8 +77,9 @@ function M.ensure(c)
     child.force = c.entity.force
     child.teleport{x = c.entity.position.x + spec.x, y = c.entity.position.y + spec.y}
     storage.children[child.unit_number] = {id = c.id, key = key}
-    if created and (key == "left_combinator" or key == "right_combinator") then A.write(child, c.outputs[key == "left_combinator" and "left" or "right"]) end
+    if not native and created and (key == "left_combinator" or key == "right_combinator") then A.write(child, c.outputs[key == "left_combinator" and "left" or "right"]) end
   end
+  if native then Circuit.ensure(c); return end
   if c.sound and c._restore_sound then
     c._restore_sound = nil
     local s = c.sound

@@ -43,7 +43,8 @@ function M.initial(check)
     m.vm.terminal_schema=1
     m.vm.guest=VM.new(assert(Compiler.compile('local _,text=os.pullEvent("char"); term.write(text); while true do os.pullEvent("char") end','=physical-lifecycle-vm')),nil,nil,{columns=51,rows=19},true)
     m.vm.fs=m.vm.guest.disk.fs
-    check('blue build selects shell and has no VM or world peripherals',m.source.backend=='event-shell' and not m.source.guest and not m.source.sub
+    check('blue build selects shell with exactly its owned left/right ports and no VM or legacy bundle',m.source.backend=='event-shell' and not m.source.guest
+      and m.source.sub.left_combinator and m.source.sub.right_combinator and not m.source.sub.lamp and not m.source.sub.speaker and not m.source.sub.speaker_combinator
       and m.source.shell.status=='initializing' and m.source.shell.job.kind=='import' and R.files(m.source)==nil)
     local fresh=blue(72); m.fresh=assert(L.build(fresh)); fresh.energy=5000000
     check('ordinary blue placement gets fresh identity and initializing readback',m.fresh.id~=m.source.id and m.fresh.backend=='event-shell' and R.status(m.fresh)=='initializing' and not R.files(m.fresh))

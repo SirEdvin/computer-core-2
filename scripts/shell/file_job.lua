@@ -3,14 +3,14 @@ local FS=require('__computer_core_2__.scripts.filesystem')
 local Import=require('__computer_core_2__.scripts.shell.import')
 local Directory=require('__computer_core_2__.scripts.shell.directory')
 local Resources=require('__computer_core_2__.scripts.shell.resources')
-local M={VERSION=1,batch=8}
-local operations={mkdir=true,cp=true,mv=true,rm=true}
+local M={VERSION=1,batch=8,write_bytes=32768}
+local operations={mkdir=true,cp=true,mv=true,rm=true,write=true}
 local function plain(t) return type(t)=='table' and getmetatable(t)==nil end
 local function integer(n,a,b) return type(n)=='number' and n==math.floor(n) and n>=a and n<=b end
 local function inside(path,base) return path==base or path:sub(1,#base+1)==base..'/' end
 local function parent(path) return path:match('^(.*)/[^/]+$') or '/' end
 function M.new(state,op,args)
-  assert(operations[op],'unknown filesystem operation')
+  assert(operations[op] and op~='write','unknown filesystem operation')
   local src=FS.path(state.disk,args[1])
   local dst=(op=='cp' or op=='mv') and FS.path(state.disk,args[2]) or src
   assert(dst~='/' and not Directory.readonly(dst),'protected filesystem destination')
@@ -41,15 +41,38 @@ function M.new(state,op,args)
   return {version=1,kind='filesystem',op=op,phase='prepare',cursor=1,source=source,
     src=src,dst=dst,nodes={},paths={},parents={},count=0,bytes=0,metadata=0,cwd=state.disk.cwd}
 end
+-- Called only after admission by the trusted editor. The immutable baseline
+-- detects target changes; the disk identity also prevents lost unrelated edits.
+function M.write(state,path,text,base)
+  assert(type(text)=='string' and #text<=M.write_bytes,'editable file byte limit exceeded')
+  assert(base==false or type(base)=='string' and #base<=M.write_bytes,'invalid write baseline')
+  path=FS.path(state.disk,path)
+  assert(path~='/' and not Directory.readonly(path),'protected filesystem destination')
+  local node=state.disk.fs[path]
+  assert(not node or node.type=='file','not a local file')
+  assert((node and node.text or false)==base,'file changed; reopen before saving')
+  local p=parent(path); if p=='' then p='/' end
+  assert(state.disk.fs[p] and state.disk.fs[p].type=='dir','destination parent does not exist')
+  local input,err=Import.capture(state.disk); assert(input,err)
+  return {version=1,kind='filesystem',op='write',phase='prepare',cursor=1,source=input.source,
+    src=path,dst=path,nodes={},paths={},parents={},count=0,bytes=0,metadata=0,cwd=state.disk.cwd,
+    text=text,base=base,origin=state.disk}
+end
 function M.valid(job)
   if not plain(job) or job.version~=M.VERSION or job.kind~='filesystem' or not operations[job.op] then return false end
   local allowed={version=true,kind=true,op=true,phase=true,cursor=true,source=true,src=true,dst=true,nodes=true,
     paths=true,parents=true,count=true,bytes=true,metadata=true,cwd=true}
+  if job.op=='write' then
+    allowed.text,allowed.base,allowed.origin=true,true,true
+    if type(job.text)~='string' or #job.text>M.write_bytes
+      or not (job.base==false or type(job.base)=='string' and #job.base<=M.write_bytes)
+      or not plain(job.origin) or not plain(job.origin.fs) then return false end
+  end
   local count=0
-  for key in pairs(job) do count=count+1; if count>16 or not allowed[key] then return false end end
+  for key in pairs(job) do count=count+1; if count>19 or not allowed[key] then return false end end
   if job.phase~='prepare' and job.phase~='publish' then return false end
   for _,key in ipairs({'src','dst','cwd'}) do if type(job[key])~='string' or #job[key]>1024 then return false end end
-  return plain(job.source) and #job.source<=FS.max_nodes+2 and plain(job.nodes) and plain(job.paths) and plain(job.parents)
+  return plain(job.source) and #job.source<=Directory.max_entries and plain(job.nodes) and plain(job.paths) and plain(job.parents)
     and integer(job.cursor,1,#job.source+1) and integer(job.count,0,FS.max_nodes)
     and integer(job.bytes,0,FS.max_bytes) and integer(job.metadata,0,Import.max_metadata)
 end
@@ -94,15 +117,25 @@ local function publication(job)
     seen[path]=true
   end
   assert(indexed==job.count and #job.paths==job.count and job.cursor==#job.source+1,'incomplete filesystem staging')
+  if job.op=='write' then
+    local node=job.nodes[job.dst]
+    assert(node and node.type=='file' and node.text==job.text,'invalid staged write')
+  end
   assert(job.nodes[job.cwd] and job.nodes[job.cwd].type=='dir' or Directory.readonly(job.cwd),'lost current directory')
   return {fs=job.nodes,paths=job.paths,cwd=job.cwd,nodes=count,bytes=bytes}
 end
 function M.audit(job)
   if not M.valid(job) then return false end
+  if job.op=='write' then
+    if job.src~=job.dst or job.dst=='/' or Directory.readonly(job.dst) then return false end
+    local original=Import.capture(job.origin)
+    if not original then return false end
+
+  end
   local count,bytes,metadata,resources=0,0,0,0
   for index,record in pairs(job.source) do
     count=count+1
-    if count>FS.max_nodes+2 or not integer(index,1,#job.source) or not plain(record)
+    if count>Directory.max_entries or not integer(index,1,#job.source) or not plain(record)
       or type(record.path)~='string' or #record.path>1024 then return false end
     local fields=0
     for key,value in pairs(record) do
@@ -119,7 +152,7 @@ function M.audit(job)
     if record.resource then
       resources=resources+1
       local bundled=Resources[record.path]
-      if resources>2 or node.type~=bundled.type or node.text~=bundled.text then return false end
+      if resources>Directory.resource_count or node.type~=bundled.type or node.text~=bundled.text then return false end
     else
       bytes=bytes+(node.type=='file' and #node.text or 0); metadata=metadata+#record.path
       if count-resources>FS.max_nodes or bytes>FS.max_bytes or metadata>Import.max_metadata then return false end
@@ -135,22 +168,29 @@ end
 function M.work(job)
   -- Table work reserves the full closed source-envelope audit as well as the
   -- staged publication/index audit. Byte processing stays in eight-record slices.
-  return {execution=1+32*M.batch,table=256*(FS.max_nodes+3),
-    filesystem=32*M.batch*1024+128,string=16*M.batch*1024+128}
+  return {execution=1+32*M.batch,table=256*(FS.max_nodes+3)+(job.op=='write' and Import.envelope_cost() or 0),
+    filesystem=32*M.batch*1024+128,string=16*M.batch*1024+128+(job.op=='write' and 2*M.write_bytes or 0)}
 end
-function M.advance(job)
+function M.advance(job,disk)
   assert(M.valid(job),'malformed filesystem job')
+  if job.op=='write' then
+    assert(disk==job.origin,'filesystem changed; reopen before saving')
+    local node=disk.fs[job.dst]
+    assert(not node or node.type=='file','file changed; reopen before saving')
+    assert((node and node.text or false)==job.base,'file changed; reopen before saving')
+  end
   if job.phase=='prepare' then
     for i=job.cursor,math.min(#job.source,job.cursor+M.batch-1) do
       local record=job.source[i]
       assert(plain(record) and type(record.path)=='string' and #record.path<=1024,'invalid filesystem source')
       local matches=inside(record.path,job.src)
-      if not record.resource and not (matches and (job.op=='mv' or job.op=='rm')) then add(job,record.path,record.node) end
+      if not record.resource and not (matches and (job.op=='mv' or job.op=='rm') or job.op=='write' and record.path==job.dst) then add(job,record.path,record.node) end
       if matches and (job.op=='cp' or job.op=='mv') then add(job,job.dst..record.path:sub(#job.src+1),record.node) end
       job.cursor=i+1
     end
     if job.cursor>#job.source then
       if job.op=='mkdir' then add(job,job.dst,{type='dir'}) end
+      if job.op=='write' then add(job,job.dst,{type='file',text=job.text}) end
       job.phase='publish'
     end
     return false

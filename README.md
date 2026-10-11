@@ -1,8 +1,9 @@
-# Computer Core 2 — experimental 0.3.0 alpha
+# Computer Core 2 — experimental 0.4.1 alpha
 
 A terminal-only computer mod for Factorio 2.0.77+. Original/personal computers use
 a pinned Recrafted BIOS, shell and editors inside a durable guest VM. A new blue
-physical computer uses a trusted, built-in-only event-driven shell. Original artwork is retained.
+physical computer uses a trusted event-driven shell, native editor and restricted
+Lua automation with owned circuit ports. Original artwork is retained.
 This is an explicitly experimental playtest, not stable or full CraftOS compatibility.
 
 **Back up saves. Prefer a fresh world or a separate upgraded-save copy. Never
@@ -11,15 +12,17 @@ are still unverified and belong to the playtester.**
 
 ## Install and use
 
-1. Copy the supplied `computer_core_2_0.3.0.zip` into Factorio's `mods` directory.
+1. Copy the supplied `computer_core_2_0.4.1.zip` into Factorio's `mods` directory.
    Do not enable the original `computer_core` simultaneously.
 2. Research Personal Computer, then Computer. Supply power to a placed computer.
 3. Stay within ten tiles and Ctrl+left-click its body, or Ctrl+G for the private
    personal gauntlet (requires research and a character).
 4. Click the terminal itself to type or paste. Native capture is visually hidden; Enter
-   submits. Use keyboard shortcuts for navigation; the fallback button row is removed.
-5. On the original VM model, type `edit /hello.lua`. Enter `print("Hello")`; Ctrl+M opens
-   the editor menu, then type **s** to save or **e** to exit. Run `/hello.lua`.
+   submits. Select a terminal key and click **Send key** for completion, history,
+   deletion or navigation; focused native text capture suppresses custom shortcuts.
+5. On the original VM model, type `edit /hello.lua`. Enter `print("Hello")`; select
+   **Editor menu**, click **Send key**, then type **s** to save or **e** to exit.
+   Run `/hello.lua`. Blue editors instead provide **Save / Exit editor** buttons.
 
 Close preserves the running OS. Reboot discards unsaved guest buffers, not saved
 files. Shutdown stops dispatch until reboot. Power loss pauses execution; overdue
@@ -48,6 +51,29 @@ historical, not instructions for this OS. Current guest contracts are documented
 and [guest runtime](docs/GUEST_RUNTIME.md). Guides/examples remain repository-only.
 
 ## Build and verify
+
+### 0.4.1 native input controls and interactive Lua alpha
+
+The 0.4.1 alpha adds native key delivery and editor controls plus an interactive
+`lua` shell: try `1+2`, `state.count=(state.count or 0)+1`, `state.count`,
+`print("Hello")`, then `exit` or **Exit Lua**. It shares the saved event scripts'
+finite scalar language and circuit API. Locals last for one submission;
+`state.FIELD` lasts for the session, including GUI close/reopen and cold reload.
+Use `stop` before entering when a background controller is active. No arbitrary
+Lua, loops, user functions, modules or VM fallback is provided. Native `edit`,
+event-script `run`, `ps`/`stop`, owned ports and stock-control example remain. Follow
+[the blue automation guide](docs/BLUE_AUTOMATION.md) for exact controls, language,
+limits and wiring. **Historical 0.4.0 input bug:** focused Factorio text fields suppress
+Ctrl+S/Ctrl+Q custom shortcuts. 0.4.1 adds native Save / Exit editor controls and
+a key selector for all models; these are not in the immutable 0.4.0 release ZIP.
+In the released blue editor, click **Terminate**, then type **s** at the dirty
+confirmation to save and return to the shell, or **c** to keep editing. No draft
+is discarded unless you explicitly choose **d**.
+The 0.3.0 description below is historical. Graphical/multiplayer acceptance
+remains incomplete. Use `python3 tests/run_engine.py --programs` and repeat with
+`--expansion`; `--archive <zip>` exercises an exact candidate package.
+
+### Historical 0.3.0 shell-only alpha
 
 The 0.3.0 alpha adds **Blue computer (shell only)**, unlocked by the same Computer
 research. Craft the blue item, place/power it and Ctrl+left-click within ten tiles.

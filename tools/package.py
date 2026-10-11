@@ -18,7 +18,7 @@ def main():
     info = json.loads((ROOT / 'info.json').read_text())
     prefix = f'{info["name"]}_{info["version"]}'
     files = [ROOT / name for name in ['info.json', 'settings.lua', 'data.lua', 'control.lua', 'LICENSE']]
-    files.extend(ROOT / name for name in ['resources/shell/manifest.json', 'resources/blue/artwork.json', 'docs/SHELL_RUNTIME.md'])
+    files.extend(ROOT / name for name in ['resources/shell/manifest.json', 'resources/blue/artwork.json', 'resources/programs/stock-controller.lua', 'docs/SHELL_RUNTIME.md', 'docs/BLUE_AUTOMATION.md'])
     for directory in ['scripts', 'graphics', 'locale']:
         files.extend(path for path in (ROOT / directory).rglob('*') if path.is_file())
     manifest = json.loads((ROOT / 'vendor/manifest.json').read_text())
@@ -37,7 +37,7 @@ def main():
     with zipfile.ZipFile(archive) as check:
         assert check.testzip() is None, 'Corrupt archive'
         assert json.loads(check.read(f'{prefix}/info.json')) == info
-        assert not any('/tests/' in name or '/.git/' in name or ('/docs/' in name and name != f'{prefix}/docs/SHELL_RUNTIME.md') or '/examples/' in name or (name.endswith('/README.md') and name != f'{prefix}/vendor/README.md') for name in check.namelist())
+        assert not any('/tests/' in name or '/.git/' in name or ('/docs/' in name and name not in {f'{prefix}/docs/SHELL_RUNTIME.md', f'{prefix}/docs/BLUE_AUTOMATION.md'}) or '/examples/' in name or (name.endswith('/README.md') and name != f'{prefix}/vendor/README.md') for name in check.namelist())
         assert check.read(f'{prefix}/resources/shell/manifest.json') == (ROOT / 'resources/shell/manifest.json').read_bytes()
         shell_manifest = json.loads(check.read(f'{prefix}/resources/shell/manifest.json'))
         for record in shell_manifest['files']:

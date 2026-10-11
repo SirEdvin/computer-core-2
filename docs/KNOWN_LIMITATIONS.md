@@ -1,15 +1,29 @@
-# Known limitations — 0.3.0 alpha
+# Known limitations — 0.4.1 alpha
 
 This is an experimental, breaking terminal-OS playtest, **not full CraftOS** and
 not a stable release. This document does not certify completed source integration,
 a published archive, migration acceptance or graphical/multiplayer acceptance.
 Follow [PLAYTEST.md](PLAYTEST.md) on a fresh world or backed-up save copy.
 
+The 0.4.1 alpha adds native input controls and a restricted interactive `lua` shell
+to 0.4.0 native `edit`, restricted source execution
+and owned circuit automation; see [BLUE_AUTOMATION.md](BLUE_AUTOMATION.md) for
+its exact restrictions and evidence boundaries. It is not a general Lua OS and
+does not close graphical or real joining-peer acceptance.
+
 ## Compatibility boundary
 
-- The new blue model is a built-in-only event shell. It cannot run Lua source,
-  editors, modules or the Recrafted OS. Its local files are data; `/rom/help.txt`
-  is read-only data, not executable ROM. Original/personal VM computers retain
+- **Known 0.4.0 client input failure:** focused Factorio text fields suppress
+  custom inputs, including Ctrl+S/Ctrl+Q. Direct-handler and GUI mock tests did
+  not test engine delivery. 0.4.1 provides native blue editor Save / Exit editor
+  and Save / Discard / Cancel buttons, plus a terminal key selector/Send key for
+  completion, deletion, navigation, history and original/personal editor menu.
+  Actual focused keyboard delivery remains subject to the engine limitation;
+  headless native click contracts are not real-client focus/render acceptance.
+
+- The blue model has a native editor and executes only validated, restricted
+  event-driven Lua source or finite interactive `lua` submissions. It cannot run arbitrary Lua, user modules or the
+  Recrafted OS. `/rom/help.txt` is read-only data. Original/personal VM computers retain
   the source-program/editor behavior described below. The blue model is released
   for explicitly authorized alpha testing; graphical and joining-peer acceptance
   remain blocking and are not inferred from the packaged headless tests.
@@ -32,8 +46,8 @@ Follow [PLAYTEST.md](PLAYTEST.md) on a fresh world or backed-up save copy.
 ## Input, presentation and shared sessions
 
 - Clicking the terminal focuses a visually hidden native capture widget. Enter
-  uses GUI confirmation; navigation uses custom inputs. The fallback button row
-  is removed. Ctrl+M opens the upstream editor menu. Physical
+  uses GUI confirmation. Select a key and Send key for navigation/completion,
+  or Editor menu for the upstream editor (then s save / e exit). Physical
   key release/held state and mouse drag are not captured: each key/cell click is
   followed by a synthetic release. Hold/repeat and shortcut interception remain
   client-unverified; custom inputs deliberately do not consume world controls.

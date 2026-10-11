@@ -11,6 +11,8 @@ local ShellScheduler = require("scripts.shell.scheduler")
 local Budget = require("scripts.shell.budget")
 local Terminal = require("scripts.guest.terminal")
 local Import = require("scripts.shell.import")
+local Circuit = require("scripts.programs.circuit")
+local Programs = require("scripts.programs.runtime")
 local M = {}
 M.files, M.display, M.status, M.running, M.backend = Backend.files, Backend.display, Backend.status, Backend.running, Backend.kind
 local function scheduler()
@@ -19,7 +21,10 @@ local function scheduler()
 end
 function M.construct_shell(id,source)
   local columns,rows=Terminal.dimensions()
-  local ok,shell,err=pcall(ShellScheduler.new,source,columns,rows,scheduler(),id,game.tick)
+  local ok,shell,err=pcall(function()
+    local ledger=scheduler(); Budget.begin(ledger,game.tick); Circuit.priority(ledger,game.tick)
+    return ShellScheduler.new(source,columns,rows,ledger,id,game.tick)
+  end)
   if not ok then return nil,'Shell initialization halted: '..tostring(shell):sub(1,4000) end
   return shell,err
 end
@@ -30,6 +35,7 @@ function M.copy_files(c)
   local ledger=scheduler()
   local ok,ready=pcall(function()
     Budget.begin(ledger,game.tick)
+    Circuit.priority(ledger,game.tick)
     return Budget.admit(ledger,c.id,{execution=1,table=2*Import.envelope_cost()+256})
   end)
   if not ok then return nil,'File readback halted: '..tostring(ready):sub(1,4000) end
@@ -137,6 +143,10 @@ end
 function M.built(c) M.migrate(c) end
 function M.supports(_) return false end -- Legacy world API extensions are intentionally retired.
 function M.stop(c)
+  if c.backend=='event-shell' then
+    Circuit.clear(c)
+    if c.shell and c.shell.controller then Programs.stop(c.shell) end
+  end
   if storage.terminal_scheduler then Scheduler.remove(storage.terminal_scheduler,c.id) end
 end
 function M.reboot(c)
@@ -165,7 +175,8 @@ function M.event(c,event)
     if not M.powered(c) then return false,'Computer is not powered' end
     if not c.shell or not Shell.compatible(c.shell) then return false,select(2,Backend.status(c)) end
     if c.shell.status=='recovery' or c.os_error then return false,c.os_error or select(2,Backend.status(c)) end
-    return ShellScheduler.push(c.shell,scheduler(),c.id,game.tick,event)
+    local ledger=scheduler(); Budget.begin(ledger,game.tick); Circuit.priority(ledger,game.tick)
+    return ShellScheduler.push(c.shell,ledger,c.id,game.tick,event)
   end
   if not M.powered(c) or not c.guest or c.os_error or c.os_stopped then return false,'Computer is not ready or powered' end
   local ok,accepted,err=pcall(VM.queue,c.guest,event)
@@ -174,7 +185,7 @@ function M.event(c,event)
 end
 function M.tick()
   local state=scheduler()
-  local ready,problem=pcall(Budget.begin,state,game.tick)
+  local ready,problem=pcall(function() Budget.begin(state,game.tick); Circuit.priority(state,game.tick) end)
   if not ready then
     storage.terminal_scheduler_error='OS scheduler halted: '..tostring(problem):sub(1,4000)
     for _,c in pairs(storage.computers) do
@@ -188,7 +199,14 @@ function M.tick()
     if not kind or c.os_error or not M.powered(c) then return end
     if kind=='vm' then if not c.os_stopped then return kind,c.guest end; return end
     if not c.shell then return kind end
-    if not Shell.compatible(c.shell) or c.shell.status=='recovery' then return end
+    if not Shell.compatible(c.shell) or c.shell.status=='recovery' then
+      local ports=c.native_ports
+      local active=ports and (ports.left and ports.left.active or ports.right and ports.right.active)
+      -- Priority cleanup already reserved these bounded engine writes. Keep
+      -- unsupported drafts/state/FIFOs intact, but never leave automation live.
+      if c.native_cleanup_tick==game.tick and (active or c.native_clear_pending) then Circuit.clear(c) end
+      return
+    end
     local first=c.shell.events.queue[1]
     if c.shell.status~='stopped' or first and (first.tuple[1]=='reboot' or first.tuple[1]=='term_resize'
       or first.tuple[1]=='terminate' or first.tuple[1]=='shutdown') then return kind,c.shell end
@@ -223,7 +241,8 @@ function M.tick()
     end
   end
   local ok,err=pcall(Scheduler.tick,state,game.tick,function(shell,ledger,id,tick)
-    return ShellScheduler.step(shell,ledger,id,tick,true)
+    local c=storage.computers[id]
+    return ShellScheduler.step(shell,ledger,id,tick,true,Circuit.service(c,shell,tick))
   end)
   if not ok then
     local index=state.cursor-1

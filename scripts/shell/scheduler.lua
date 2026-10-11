@@ -4,6 +4,7 @@ local Shell=require('__computer_core_2__.scripts.shell.runtime')
 local Budget=require('__computer_core_2__.scripts.shell.budget')
 local Events=require('__computer_core_2__.scripts.guest.events')
 local Limits=require('__computer_core_2__.scripts.guest.limits')
+local Programs=require('__computer_core_2__.scripts.programs.runtime')
 local M={}
 local function callback(ledger,id)
   return function(cost) return Budget.admit(ledger,id,cost) end
@@ -48,7 +49,7 @@ function M.cancel_timer(state,ledger,id,tick,timer)
   Events.cancel_timer(state.events,timer)
   return true
 end
-function M.step(state,ledger,id,tick,powered)
+local function foreground(state,ledger,id,tick,powered,services)
   Budget.begin(ledger,tick)
   if not Shell.compatible(state) then return Shell.handle(state,{n=1,'advance'},callback(ledger,id)) end
   local first=state.events.queue[1]
@@ -63,18 +64,31 @@ function M.step(state,ledger,id,tick,powered)
   -- Jobs own their immutable arguments; later ordinary input remains queued.
   local record=state.events.queue[1]
   if state.job and not control then
-    return Shell.handle(state,{n=1,'advance'},callback(ledger,id))
+    return Shell.handle(state,{n=1,'advance'},callback(ledger,id),services)
   end
-  if not record then return false end
+  if not record then
+    if not state.editor and state.program_output and #state.program_output.queue>0 then
+      return Shell.handle(state,{n=1,'advance'},callback(ledger,id),services)
+    end
+    return false
+  end
   local count=#state.events.queue
   local events=state.events
   local handled,reason=Shell.handle(state,record.tuple,function(cost)
     cost.event=(cost.event or 0)+1+3*count
     return Budget.admit(ledger,id,cost)
-  end)
+  end,services)
   if handled and state.events==events then
     table.remove(state.events.queue,1)
     state.events.bytes=state.events.bytes-record.bytes
+  end
+  return handled,reason
+end
+function M.step(state,ledger,id,tick,powered,services)
+  local handled,reason=foreground(state,ledger,id,tick,powered,services)
+  if Shell.compatible(state) and state.status~='recovery' then
+    local background,err=Programs.step(state,tick,powered~=false and state.status=='ready',callback(ledger,id),services)
+    return handled or background,reason or err
   end
   return handled,reason
 end
